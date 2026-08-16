@@ -1,0 +1,23 @@
+database:
+  type: postgres
+
+ejbca:
+  env:
+    DATABASE_JDBC_URL: jdbc:postgresql://postgres-postgresql:5432/ejbcadb
+
+  envRaw:
+    - name: DATABASE_USER
+      value: ejbca
+
+    - name: DATABASE_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: postgres-postgresql
+          key: password
+
+nginx:
+  enabled: true
+  initializeWithSelfSignedTls: true
+
+  service:
+    type: LoadBalancer

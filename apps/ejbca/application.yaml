@@ -43,6 +43,7 @@ spec:
         - .metadata.annotations."meta.helm.sh/release-name"
         - .metadata.annotations."meta.helm.sh/release-namespace"
         - .metadata.labels."app.kubernetes.io/managed-by"
+        - .metadata.finalizers
         - .spec.allocateLoadBalancerNodePorts
         - .spec.clusterIP
         - .spec.clusterIPs

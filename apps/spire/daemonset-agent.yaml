@@ -15,9 +15,7 @@ spec:
         app: spire-agent
     spec:
       serviceAccountName: spire-agent
-      hostNetwork: true
-      hostPID: true
-      dnsPolicy: ClusterFirstWithHostNet
+      dnsPolicy: ClusterFirst
       initContainers:
       - name: init
         image: busybox:1.37.0

@@ -1,0 +1,18 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: openbao-server-tls
+  namespace: openbao
+spec:
+  secretName: openbao-server-tls
+  issuerRef:
+    name: homelab-selfsigned
+    kind: ClusterIssuer
+  dnsNames:
+    - openbao
+    - openbao.openbao
+    - openbao.openbao.svc
+    - openbao.openbao.svc.cluster.local
+    - "*.openbao-internal"
+  ipAddresses:
+    - 127.0.0.1

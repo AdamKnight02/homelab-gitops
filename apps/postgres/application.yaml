@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: postgres
+  namespace: argocd
+
+spec:
+  project: default
+
+  sources:
+    - repoURL: https://charts.bitnami.com/bitnami
+      chart: postgresql
+      targetRevision: 18.8.6
+      helm:
+        releaseName: postgres
+        valueFiles:
+          - $values/apps/postgres/values.yaml
+
+    - repoURL: https://github.com/AdamKnight02/homelab-gitops.git
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ejbca
+
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=false

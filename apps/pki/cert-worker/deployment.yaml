@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cert-worker
+  namespace: pki
+  labels:
+    app: cert-worker
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cert-worker
+  template:
+    metadata:
+      labels:
+        app: cert-worker
+    spec:
+      serviceAccountName: cert-worker
+      containers:
+      - name: cert-worker
+        image: cert-worker:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://certapi:certinventory-password-change-me@pki-database:5432/certinventory"
+        - name: EJBCA_URL
+          value: "https://ejbca-ejbca-ce:8443/ejbca"
+        - name: OPENBAO_URL
+          value: "https://openbao:8200"
+        - name: KUBERNETES_API_URL
+          value: "https://kubernetes.default.svc"
+        - name: TLS_SCAN_TARGETS
+          value: ""
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        volumeMounts:
+        - name: kubernetes-token
+          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+          readOnly: true
+      volumes:
+      - name: kubernetes-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              expirationSeconds: 3600
+              path: token
+          - configMap:
+              name: kube-root-ca.crt
+              items:
+              - key: ca.crt
+                path: ca.crt
+          - downwardAPI:
+              items:
+              - path: namespace
+                fieldRef:
+                  fieldPath: metadata.namespace

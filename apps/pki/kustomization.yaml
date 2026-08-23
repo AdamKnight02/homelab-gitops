@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: pki
+
+resources:
+  - namespace.yaml
+  - serviceaccount-cert-worker.yaml
+  - serviceaccount-cert-api.yaml
+  - networkpolicy-default-deny.yaml
+  - networkpolicy-cert-worker.yaml
+  - networkpolicy-cert-api.yaml

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pki
+  labels:
+    app.kubernetes.io/name: pki
+    app.kubernetes.io/part-of: machine-identity-platform

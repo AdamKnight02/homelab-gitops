@@ -19,7 +19,7 @@ spec:
       serviceAccountName: cert-api
       containers:
       - name: ca-service
-        image: ca-service:latest
+        image: 10.42.0.88:5000/ca-service:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000

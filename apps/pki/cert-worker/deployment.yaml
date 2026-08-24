@@ -19,7 +19,7 @@ spec:
       serviceAccountName: cert-worker
       containers:
       - name: cert-worker
-        image: cert-worker:latest
+        image: 10.42.0.88:5000/cert-worker:latest
         imagePullPolicy: IfNotPresent
         env:
         - name: DATABASE_URL

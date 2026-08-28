@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cert-renewal-config
+  namespace: pki
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+data:
+  renewal-policy.yaml: |
+    policy:
+      name: default-renewal-policy
+      version: "1.0"
+      
+      # Renewal thresholds
+      thresholds:
+        warning_days: 30
+        critical_days: 7
+        emergency_days: 1
+      
+      # Auto-renewal settings
+      auto_renew:
+        enabled: true
+        # Require approval for certain certificate types
+        require_approval:
+          - root_ca
+          - intermediate_ca
+        
+      # Renewal windows (stagger to avoid thundering herd)
+      renewal_window:
+        enabled: true
+        max_daily_renewals: 50
+        preferred_hours:
+          start: 2  # 2 AM
+          end: 6    # 6 AM
+      
+      # Source-specific policies
+      sources:
+        ejbca:
+          renewal_method: api
+          approval_required: false
+          
+        openbao_pki:
+          renewal_method: api
+          approval_required: false
+          
+        cert_manager:
+          renewal_method: auto
+          approval_required: false
+          
+        kubernetes_secret:
+          renewal_method: manual
+          approval_required: true
+      
+      # Notification settings
+      notifications:
+        on_warning: true
+        on_critical: true
+        on_failure: true
+        channels:
+          - prometheus_alert
+          - webhook
+      
+      # Retry settings
+      retry:
+        max_attempts: 3
+        backoff_seconds: 60
+        exponential: true

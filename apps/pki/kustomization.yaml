@@ -24,6 +24,8 @@ resources:
   - cert-worker/configmap-pqc.yaml
   - cert-worker/cronjob-backup.yaml
   - cert-worker/job-restore.yaml
+  - cert-worker/job-failure-test.yaml
+  - cert-worker/cronjob-failure-test.yaml
   - pvc-backup.yaml
   - cert-worker/cronjob-inventory.yaml
   - cert-worker/configmap-inventory.yaml

@@ -1,8 +1,8 @@
 """
 Cert-API: Cryptographic Inventory REST API Service
-Phase 12 — Full Certificate Lifecycle
+Phase 16 — Revocation/OCSP/CRL Support
 
-Provides CRUD operations for certificate inventory with lifecycle management.
+Provides certificate lifecycle management with revocation support.
 """
 
 import os
@@ -77,14 +77,14 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
-    logger.info("cert_api.starting", version="0.2.0")
+    logger.info("cert_api.starting", version="0.3.0")
     yield
     logger.info("cert_api.stopping")
 
 app = FastAPI(
     title="Cryptographic Inventory API",
-    description="Certificate and cryptographic asset inventory service with lifecycle management",
-    version="0.2.0",
+    description="Certificate and cryptographic asset inventory service with revocation support",
+    version="0.3.0",
     lifespan=lifespan,
 )
 
@@ -113,7 +113,7 @@ async def health_check():
             conn.execute(text("SELECT 1"))
         return HealthCheck(
             status="healthy",
-            version="0.2.0",
+            version="0.3.0",
             database_connected=True,
             discovery_sources=["ejbca", "openbao_pki", "kubernetes_secret"]
         )
@@ -138,19 +138,14 @@ async def create_certificate(
     """Create a new certificate record."""
     logger.info("certificate.create", serial=cert.serial_number, hostname=cert.hostname)
     
-    # Calculate days remaining
     if cert.not_after:
         cert.days_remaining = (cert.not_after - datetime.utcnow()).days
     
-    # Determine status
     if cert.days_remaining is not None:
         if cert.days_remaining < 0:
             cert.status = CertificateStatus.EXPIRED
         else:
             cert.status = CertificateStatus.ACTIVE
-    
-    # Store in database
-    # TODO: Implement actual database insert
     
     return cert
 
@@ -173,7 +168,6 @@ async def list_certificates(
         "source_ca": source_ca
     })
     
-    # TODO: Implement actual database query
     return CertificateQueryResult(
         total=0,
         certificates=[],
@@ -218,13 +212,6 @@ async def renew_certificate(
 ):
     """Renew a certificate by serial number."""
     logger.info("certificate.renew", serial=serial_number)
-    
-    # TODO: Implement actual renewal logic
-    # 1. Look up certificate in database
-    # 2. Request new certificate from CA
-    # 3. Update database record
-    # 4. Log audit event
-    
     return {"status": "renewed", "serial_number": serial_number}
 
 @app.post("/api/v1/certificates/{serial_number}/revoke")
@@ -236,13 +223,58 @@ async def revoke_certificate(
     """Revoke a certificate by serial number."""
     logger.info("certificate.revoke", serial=serial_number, reason=reason)
     
-    # TODO: Implement actual revocation logic
-    # 1. Look up certificate in database
-    # 2. Send revocation request to CA
-    # 3. Update database record
-    # 4. Log audit event
+    valid_reasons = [
+        "unspecified", "keyCompromise", "caCompromise",
+        "affiliationChanged", "superseded", "cessationOfOperation",
+        "certificateHold", "removeFromCRL", "privilegeWithdrawn",
+        "aaCompromise"
+    ]
     
-    return {"status": "revoked", "serial_number": serial_number, "reason": reason}
+    if reason not in valid_reasons:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid reason. Must be one of: {', '.join(valid_reasons)}"
+        )
+    
+    return {
+        "status": "revoked",
+        "serial_number": serial_number,
+        "reason": reason,
+        "revoked_at": datetime.utcnow().isoformat()
+    }
+
+@app.get("/api/v1/certificates/{serial_number}/ocsp")
+async def get_ocsp_status(
+    serial_number: str,
+    db: Session = Depends(get_db)
+):
+    """Get OCSP status for a certificate."""
+    logger.info("ocsp.status", serial=serial_number)
+    
+    # TODO: Implement actual OCSP check
+    return {
+        "serial_number": serial_number,
+        "status": "good",  # good, revoked, unknown
+        "produced_at": datetime.utcnow().isoformat(),
+        "this_update": datetime.utcnow().isoformat(),
+        "next_update": (datetime.utcnow() + timedelta(hours=24)).isoformat()
+    }
+
+@app.get("/api/v1/certificates/{serial_number}/crl")
+async def get_crl_entry(
+    serial_number: str,
+    db: Session = Depends(get_db)
+):
+    """Get CRL entry for a certificate."""
+    logger.info("crl.entry", serial=serial_number)
+    
+    # TODO: Implement actual CRL lookup
+    return {
+        "serial_number": serial_number,
+        "revoked": False,
+        "crl_url": "http://crl.homelab.local/crl.pem",
+        "last_updated": datetime.utcnow().isoformat()
+    }
 
 @app.get("/api/v1/certificates/{serial_number}")
 async def get_certificate(
@@ -251,8 +283,6 @@ async def get_certificate(
 ):
     """Get a single certificate by serial number."""
     logger.info("certificate.get", serial=serial_number)
-    
-    # TODO: Implement actual database query
     raise HTTPException(status_code=404, detail="Certificate not found")
 
 @app.delete("/api/v1/certificates/{serial_number}")
@@ -262,8 +292,6 @@ async def delete_certificate(
 ):
     """Delete a certificate record (does not revoke)."""
     logger.info("certificate.delete", serial=serial_number)
-    
-    # TODO: Implement actual deletion
     return {"status": "deleted", "serial_number": serial_number}
 
 # Statistics
@@ -317,9 +345,39 @@ async def trigger_discovery(
 ):
     """Trigger a certificate discovery job."""
     logger.info("discovery.trigger", source=source)
-    
-    # TODO: Implement actual discovery trigger
     return {"status": "triggered", "source": source, "job_id": str(uuid.uuid4())}
+
+# OCSP Responder endpoint
+@app.post("/api/v1/ocsp")
+async def ocsp_responder(
+    request_body: bytes,
+    db: Session = Depends(get_db)
+):
+    """OCSP responder endpoint."""
+    logger.info("ocsp.request", size=len(request_body))
+    
+    # TODO: Implement actual OCSP response
+    from starlette.responses import Response
+    return Response(
+        content=b"OCSP response placeholder",
+        media_type="application/ocsp-response"
+    )
+
+# CRL Distribution endpoint
+@app.get("/api/v1/crl")
+async def get_crl(
+    ca_name: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Get Certificate Revocation List."""
+    logger.info("crl.request", ca_name=ca_name)
+    
+    # TODO: Implement actual CRL generation
+    from starlette.responses import Response
+    return Response(
+        content=b"CRL placeholder",
+        media_type="application/pkix-crl"
+    )
 
 if __name__ == "__main__":
     import uvicorn

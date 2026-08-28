@@ -17,6 +17,7 @@ resources:
   - cert-worker/deployment.yaml
   - cert-worker/cronjob-renewal.yaml
   - cert-worker/configmap-renewal.yaml
+  - cert-worker/cronjob-revocation-check.yaml
   - cert-worker/cronjob-inventory.yaml
   - cert-worker/configmap-inventory.yaml
   - cert-worker/job-discovery.yaml

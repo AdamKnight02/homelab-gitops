@@ -1,0 +1,105 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cert-revocation-check
+  namespace: pki
+  labels:
+    app: cert-revocation-check
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  schedule: "0 */12 * * *"  # Every 12 hours
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      labels:
+        app: cert-revocation-check
+    spec:
+      template:
+        spec:
+          serviceAccountName: cert-worker
+          restartPolicy: OnFailure
+          containers:
+          - name: revocation-check
+            image: 10.42.0.88:5000/cert-worker:latest
+            imagePullPolicy: IfNotPresent
+            command: ["python", "-c"]
+            args:
+            - |
+              import os
+              import sys
+              import httpx
+              import structlog
+              from datetime import datetime
+              
+              logger = structlog.get_logger()
+              
+              CERT_API_URL = os.getenv("CERT_API_URL", "http://cert-api:8000")
+              
+              def check_revocations():
+                  try:
+                      logger.info("revocation.check.started")
+                      
+                      # Get all active certificates
+                      resp = httpx.get(
+                          f"{CERT_API_URL}/api/v1/certificates",
+                          params={"status": "active", "limit": 1000},
+                          timeout=60.0
+                      )
+                      resp.raise_for_status()
+                      certs = resp.json().get("certificates", [])
+                      
+                      checked = 0
+                      revoked_found = 0
+                      errors = 0
+                      
+                      for cert in certs:
+                          serial = cert.get("serial_number")
+                          source = cert.get("source_ca")
+                          
+                          try:
+                              # Check revocation status via API
+                              status_resp = httpx.get(
+                                  f"{CERT_API_URL}/api/v1/certificates/{serial}",
+                                  timeout=30.0
+                              )
+                              
+                              if status_resp.status_code == 200:
+                                  cert_data = status_resp.json()
+                                  if cert_data.get("status") == "revoked":
+                                      revoked_found += 1
+                                      logger.warning("revocation.found",
+                                                   serial=serial,
+                                                   source=source)
+                              
+                              checked += 1
+                              
+                          except Exception as e:
+                              errors += 1
+                              logger.error("revocation.check.error",
+                                         serial=serial,
+                                         error=str(e))
+                      
+                      logger.info("revocation.check.completed",
+                                checked=checked,
+                                revoked_found=revoked_found,
+                                errors=errors)
+                      
+                      return 0
+                      
+                  except Exception as e:
+                      logger.error("revocation.check.failed", error=str(e))
+                      return 1
+              
+              sys.exit(check_revocations())
+            env:
+            - name: CERT_API_URL
+              value: "http://cert-api:8000"
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 256Mi

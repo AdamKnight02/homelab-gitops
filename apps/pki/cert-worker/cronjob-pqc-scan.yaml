@@ -1,0 +1,125 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pqc-readiness-scan
+  namespace: pki
+  labels:
+    app: pqc-readiness-scan
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  schedule: "0 4 * * 0"  # Weekly on Sunday at 4 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      labels:
+        app: pqc-readiness-scan
+    spec:
+      template:
+        spec:
+          serviceAccountName: cert-worker
+          restartPolicy: OnFailure
+          containers:
+          - name: pqc-scan
+            image: 10.42.0.88:5000/cert-worker:latest
+            imagePullPolicy: IfNotPresent
+            command: ["python", "-c"]
+            args:
+            - |
+              import os
+              import sys
+              import httpx
+              import structlog
+              from datetime import datetime
+              
+              logger = structlog.get_logger()
+              
+              CERT_API_URL = os.getenv("CERT_API_URL", "http://cert-api:8000")
+              
+              # PQC readiness thresholds (NIST recommendations)
+              PQC_THRESHOLDS = {
+                  "RSA": {"minimum": 3072, "hybrid_ready": 4096},
+                  "ECDSA": {"minimum": 384, "hybrid_ready": 521},
+                  "Ed25519": {"minimum": 256, "hybrid_ready": 256},
+              }
+              
+              def assess_pqc_readiness(cert):
+                  algo = cert.get("key_algorithm", "UNKNOWN")
+                  size = cert.get("key_size", 0)
+                  sig = cert.get("signature_algorithm", "")
+                  
+                  # Already PQC algorithms
+                  if algo in ["ML-KEM", "ML-DSA", "SLH-DSA"]:
+                      return "ready", "Using post-quantum algorithm"
+                  
+                  # Check classical algorithm against PQC thresholds
+                  threshold = PQC_THRESHOLDS.get(algo, {})
+                  minimum = threshold.get("minimum", 0)
+                  
+                  if size >= minimum:
+                      return "migrating", f"{algo} {size} bits meets PQC minimum"
+                  
+                  return "vulnerable", f"{algo} {size} bits below PQC threshold of {minimum}"
+              
+              def run_pqc_scan():
+                  try:
+                      logger.info("pqc.scan.started")
+                      
+                      # Get all active certificates
+                      resp = httpx.get(
+                          f"{CERT_API_URL}/api/v1/certificates",
+                          params={"status": "active", "limit": 1000},
+                          timeout=60.0
+                      )
+                      resp.raise_for_status()
+                      certs = resp.json().get("certificates", [])
+                      
+                      ready = 0
+                      migrating = 0
+                      vulnerable = 0
+                      unknown = 0
+                      
+                      for cert in certs:
+                          serial = cert.get("serial_number")
+                          hostname = cert.get("hostname", "unknown")
+                          
+                          readiness, reason = assess_pqc_readiness(cert)
+                          
+                          if readiness == "ready":
+                              ready += 1
+                          elif readiness == "migrating":
+                              migrating += 1
+                          elif readiness == "vulnerable":
+                              vulnerable += 1
+                              logger.warning("pqc.vulnerable",
+                                           serial=serial,
+                                           hostname=hostname,
+                                           reason=reason)
+                          else:
+                              unknown += 1
+                      
+                      logger.info("pqc.scan.completed",
+                                total=len(certs),
+                                ready=ready,
+                                migrating=migrating,
+                                vulnerable=vulnerable,
+                                unknown=unknown)
+                      
+                      return 0
+                      
+                  except Exception as e:
+                      logger.error("pqc.scan.failed", error=str(e))
+                      return 1
+              
+              sys.exit(run_pqc_scan())
+            env:
+            - name: CERT_API_URL
+              value: "http://cert-api:8000"
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 256Mi

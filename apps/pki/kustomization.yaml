@@ -20,6 +20,8 @@ resources:
   - cert-worker/cronjob-revocation-check.yaml
   - cert-worker/configmap-policy.yaml
   - cert-worker/cronjob-policy-check.yaml
+  - cert-worker/cronjob-pqc-scan.yaml
+  - cert-worker/configmap-pqc.yaml
   - cert-worker/cronjob-inventory.yaml
   - cert-worker/configmap-inventory.yaml
   - cert-worker/job-discovery.yaml

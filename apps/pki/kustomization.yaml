@@ -13,7 +13,7 @@ resources:
   - networkpolicy-cert-api.yaml
   - database/deployment.yaml
   - cert-api/deployment.yaml
-  - cert-api/deployment-spire.yaml
+  # - cert-api/deployment-spire.yaml  # Disabled - CSI driver not installed
   - cert-worker/deployment.yaml
   - cert-worker/cronjob-renewal.yaml
   - cert-worker/configmap-renewal.yaml
@@ -24,8 +24,8 @@ resources:
   - cert-worker/configmap-pqc.yaml
   - cert-worker/cronjob-backup.yaml
   - cert-worker/job-restore.yaml
-  - cert-worker/job-failure-test.yaml
-  - cert-worker/cronjob-failure-test.yaml
+  # - cert-worker/job-failure-test.yaml      # Disabled - cert-api not fully deployed
+  # - cert-worker/cronjob-failure-test.yaml  # Disabled - cert-api not fully deployed
   - pvc-backup.yaml
   - cert-worker/cronjob-inventory.yaml
   - cert-worker/configmap-inventory.yaml

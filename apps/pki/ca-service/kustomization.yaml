@@ -4,8 +4,8 @@ kind: Kustomization
 namespace: pki
 
 resources:
-  - deployment.yaml
+  - deploy/deployment.yaml
 
 commonLabels:
   app.kubernetes.io/part-of: machine-identity-platform
-  app.kubernetes.io/component: database
+  app.kubernetes.io/component: ca-service

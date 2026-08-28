@@ -5,3 +5,17 @@ namespace: pki
 
 resources:
   - deployment.yaml
+  - cronjob-renewal.yaml
+  - cronjob-inventory.yaml
+  - cronjob-policy-check.yaml
+  - cronjob-pqc-scan.yaml
+  - cronjob-backup.yaml
+  - cronjob-failure-test.yaml
+  - job-discovery.yaml
+  - job-failure-test.yaml
+  - job-restore.yaml
+  - configmap-inventory.yaml
+  - configmap-renewal.yaml
+  - configmap-policy.yaml
+  - configmap-pqc.yaml
+  - networkpolicy-discovery.yaml

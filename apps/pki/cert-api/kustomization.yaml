@@ -5,3 +5,8 @@ namespace: pki
 
 resources:
   - deployment.yaml
+  - deployment-spire.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: machine-identity-platform
+  app.kubernetes.io/component: cert-api

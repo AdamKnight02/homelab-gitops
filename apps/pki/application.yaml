@@ -8,6 +8,7 @@ metadata:
   labels:
     app.kubernetes.io/name: pki
     app.kubernetes.io/part-of: machine-identity-platform
+    gitops.maturity: advanced
 spec:
   project: default
   source:
@@ -21,13 +22,26 @@ spec:
     automated:
       prune: true
       selfHeal: true
+      allowEmpty: false
     syncOptions:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
       - PruneLast=true
+      - RespectIgnoreDifferences=true
+      - ApplyOutOfSyncOnly=true
     retry:
       limit: 5
       backoff:
         duration: 5s
         factor: 2
         maxDuration: 3m
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    - group: batch
+      kind: CronJob
+      jsonPointers:
+        - /spec/suspend
+  revisionHistoryLimit: 10

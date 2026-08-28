@@ -1,0 +1,107 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cert-renewal-check
+  namespace: pki
+  labels:
+    app: cert-renewal-check
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      labels:
+        app: cert-renewal-check
+    spec:
+      template:
+        spec:
+          serviceAccountName: cert-worker
+          restartPolicy: OnFailure
+          containers:
+          - name: renewal-check
+            image: 10.42.0.88:5000/cert-worker:latest
+            imagePullPolicy: IfNotPresent
+            command: ["python", "-c"]
+            args:
+            - |
+              import os
+              import sys
+              import httpx
+              import structlog
+              from datetime import datetime, timedelta
+              
+              logger = structlog.get_logger()
+              
+              CERT_API_URL = os.getenv("CERT_API_URL", "http://cert-api:8000")
+              RENEWAL_THRESHOLD_DAYS = int(os.getenv("RENEWAL_THRESHOLD_DAYS", "30"))
+              
+              def check_renewals():
+                  try:
+                      response = httpx.get(f"{CERT_API_URL}/api/v1/certificates/expiring", 
+                                          params={"days": RENEWAL_THRESHOLD_DAYS},
+                                          timeout=30.0)
+                      response.raise_for_status()
+                      certs = response.json().get("certificates", [])
+                      
+                      if not certs:
+                          logger.info("No certificates require renewal")
+                          return 0
+                      
+                      renewed = 0
+                      failed = 0
+                      
+                      for cert in certs:
+                          serial = cert["serial_number"]
+                          hostname = cert.get("hostname", "unknown")
+                          days = cert.get("days_remaining", 0)
+                          
+                          logger.info("Processing renewal", 
+                                    serial=serial, 
+                                    hostname=hostname, 
+                                    days_remaining=days)
+                          
+                          try:
+                              renew_resp = httpx.post(
+                                  f"{CERT_API_URL}/api/v1/certificates/{serial}/renew",
+                                  timeout=60.0
+                              )
+                              renew_resp.raise_for_status()
+                              renewed += 1
+                              logger.info("Certificate renewed", 
+                                        serial=serial, 
+                                        hostname=hostname)
+                          except Exception as e:
+                              failed += 1
+                              logger.error("Renewal failed", 
+                                         serial=serial, 
+                                         hostname=hostname, 
+                                         error=str(e))
+                      
+                      logger.info("Renewal check complete", 
+                                renewed=renewed, 
+                                failed=failed, 
+                                total=len(certs))
+                      return 0 if failed == 0 else 1
+                      
+                  except Exception as e:
+                      logger.error("Renewal check failed", error=str(e))
+                      return 1
+              
+              sys.exit(check_renewals())
+            env:
+            - name: CERT_API_URL
+              value: "http://cert-api:8000"
+            - name: RENEWAL_THRESHOLD_DAYS
+              value: "30"
+            - name: DATABASE_URL
+              value: "postgresql://certapi:certinventory-password-change-me@pki-database:5432/certinventory"
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 256Mi

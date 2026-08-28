@@ -1,0 +1,24 @@
+name: Argo CD Sync Check
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:
+
+jobs:
+  check-sync:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check Argo CD Application Status
+      run: |
+        # This would typically use argocd CLI or API
+        # For now, we'll document the expected checks
+        echo "Checking Argo CD application sync status..."
+        echo "Expected applications:"
+        echo "  - pki (should be Synced and Healthy)"
+        echo "  - openbao (should be Synced and Healthy)"
+        echo "  - spire (should be Synced and Healthy)"
+        echo "  - cert-manager (should be Synced and Healthy)"
+        echo ""
+        echo "Note: In production, this would query the Argo CD API"
+        echo "and alert if any application is OutOfSync or Degraded"

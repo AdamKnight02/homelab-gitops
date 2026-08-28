@@ -1,0 +1,85 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pki-health
+  namespace: pki
+  labels:
+    app: pki-health
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  groups:
+  - name: pki-certificates
+    interval: 60s
+    rules:
+    - alert: CertificateExpiringSoon
+      expr: |
+        cert_inventory_days_remaining < 30
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Certificate expiring soon"
+        description: "Certificate {{ $labels.hostname }} expires in {{ $value }} days"
+
+    - alert: CertificateExpired
+      expr: |
+        cert_inventory_days_remaining < 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Certificate has expired"
+        description: "Certificate {{ $labels.hostname }} expired {{ $value }} days ago"
+
+    - alert: WeakCertificateKey
+      expr: |
+        cert_inventory_key_size < 2048 and cert_inventory_key_algorithm == "RSA"
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Weak certificate key detected"
+        description: "Certificate {{ $labels.hostname }} uses {{ $labels.key_algorithm }} key with {{ $labels.key_size }} bits"
+
+    - alert: DeprecatedSignatureAlgorithm
+      expr: |
+        cert_inventory_signature_algorithm =~ "sha1.*|md5.*"
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Deprecated signature algorithm detected"
+        description: "Certificate {{ $labels.hostname }} uses {{ $labels.signature_algorithm }}"
+
+  - name: pki-services
+    interval: 30s
+    rules:
+    - alert: CertAPIHighErrorRate
+      expr: |
+        rate(cert_api_requests_total{status=~"5.."}[5m]) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Cert API high error rate"
+        description: "Cert API error rate is {{ $value }} errors/sec"
+
+    - alert: CertAPIDown
+      expr: |
+        up{job="cert-api"} == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Cert API is down"
+        description: "Cert API has been down for more than 1 minute"
+
+    - alert: CAServiceDown
+      expr: |
+        up{job="ca-service"} == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "CA Service is down"
+        description: "CA Service has been down for more than 1 minute"

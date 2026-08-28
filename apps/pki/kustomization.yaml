@@ -14,3 +14,6 @@ resources:
   - cert-api/deployment.yaml
   - cert-worker/deployment.yaml
   - ca-service/deploy/deployment.yaml
+  - servicemonitor-cert-api.yaml
+  - servicemonitor-ca-service.yaml
+  - prometheusrules-pki.yaml

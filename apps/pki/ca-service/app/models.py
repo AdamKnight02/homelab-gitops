@@ -1,0 +1,237 @@
+"""
+CA Abstraction Layer Models
+Phase 6 — Multi-CA Abstraction
+"""
+
+from datetime import datetime
+from enum import Enum
+from typing import List, Optional, Dict, Any, Set
+from pydantic import BaseModel, Field
+
+
+class CAProvider(str, Enum):
+    """Supported CA providers."""
+    EJBCA = "ejbca"
+    OPENBAO_PKI = "openbao_pki"
+    SMALLSTEP = "smallstep"
+    CERT_MANAGER = "cert_manager"
+    # Future providers
+    # AWS_PRIVATE_CA = "aws_private_ca"
+    # AZURE_KEY_VAULT = "azure_key_vault"
+    # GOOGLE_CA_SERVICE = "google_ca_service"
+
+
+class CAOperation(str, Enum):
+    """Operations that can be performed by a CA provider."""
+    ISSUE_CERTIFICATE = "issue_certificate"
+    REVOKE_CERTIFICATE = "revoke_certificate"
+    GET_CERTIFICATE = "get_certificate"
+    GET_CA_CHAIN = "get_ca_chain"
+    GET_STATUS = "get_status"
+    RENEW_CERTIFICATE = "renew_certificate"
+    LIST_CERTIFICATES = "list_certificates"
+    GENERATE_CRL = "generate_crl"
+    GET_OCSP_RESPONSE = "get_ocsp_response"
+
+
+class Capability(str, Enum):
+    """Fine-grained capabilities."""
+    # Certificate operations
+    ISSUE = "issue"
+    REVOKE = "revoke"
+    RENEW = "renew"
+    READ = "read"
+    LIST = "list"
+    
+    # CA management
+    CA_CHAIN = "ca_chain"
+    CRL = "crl"
+    OCSP = "ocsp"
+    
+    # Profile/role management
+    CERTIFICATE_PROFILES = "certificate_profiles"
+    END_ENTITY_PROFILES = "end_entity_profiles"
+    ROLES = "roles"
+    
+    # Authentication
+    USER_AUTH = "user_auth"
+    TOKEN_AUTH = "token_auth"
+    CERT_AUTH = "cert_auth"
+    
+    # Special features
+    SHORT_LIVED = "short_lived"
+    ACME = "acme"
+    SCEP = "scep"
+    EST = "est"
+    WORKLOAD_IDENTITY = "workload_identity"
+
+
+class CAProviderCapabilities(BaseModel):
+    """Capabilities of a CA provider."""
+    provider: CAProvider
+    version: Optional[str] = None
+    operations: Set[CAOperation] = Field(default_factory=set)
+    capabilities: Set[Capability] = Field(default_factory=set)
+    certificate_profiles: List[str] = Field(default_factory=list)
+    max_certificate_validity_days: Optional[int] = None
+    supports_custom_extensions: bool = False
+    supports_subject_alternative_names: bool = True
+    max_sans: Optional[int] = None
+    supported_key_algorithms: List[str] = Field(default_factory=list)
+    supported_signature_algorithms: List[str] = Field(default_factory=list)
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "provider": "ejbca",
+                "version": "9.3.7",
+                "operations": [
+                    "issue_certificate",
+                    "revoke_certificate",
+                    "get_certificate",
+                    "get_ca_chain",
+                    "get_status",
+                    "renew_certificate",
+                    "list_certificates",
+                    "generate_crl",
+                    "get_ocsp_response"
+                ],
+                "capabilities": [
+                    "issue", "revoke", "renew", "read", "list",
+                    "ca_chain", "crl", "ocsp",
+                    "certificate_profiles", "end_entity_profiles",
+                    "user_auth", "cert_auth"
+                ],
+                "certificate_profiles": ["TLS Server", "TLS Client", "Code Signing"],
+                "max_certificate_validity_days": 365,
+                "supports_custom_extensions": True,
+                "supports_subject_alternative_names": True,
+                "max_sans": 100,
+                "supported_key_algorithms": ["RSA", "ECDSA"],
+                "supported_signature_algorithms": ["SHA256withRSA", "SHA384withRSA"]
+            }
+        }
+
+
+class CertificateRequest(BaseModel):
+    """Request to issue a certificate."""
+    # Identity
+    common_name: str
+    subject_alternative_names: List[str] = Field(default_factory=list)
+    
+    # Subject fields
+    country: Optional[str] = None
+    organization: Optional[str] = None
+    organizational_unit: Optional[str] = None
+    locality: Optional[str] = None
+    province: Optional[str] = None
+    
+    # Cryptographic parameters
+    key_algorithm: str = "RSA"
+    key_size: int = 2048
+    signature_algorithm: Optional[str] = None
+    
+    # Certificate parameters
+    validity_days: int = 365
+    certificate_profile: Optional[str] = None
+    
+    # Extensions
+    key_usage: List[str] = Field(default_factory=list)
+    extended_key_usage: List[str] = Field(default_factory=list)
+    custom_extensions: Dict[str, Any] = Field(default_factory=dict)
+    
+    # Metadata
+    owner: Optional[str] = None
+    application: Optional[str] = None
+    environment: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class CertificateResponse(BaseModel):
+    """Response from certificate issuance."""
+    certificate_id: Optional[str] = None
+    serial_number: str
+    certificate_pem: str
+    ca_chain_pem: List[str] = Field(default_factory=list)
+    private_key_pem: Optional[str] = None  # Only if generated by CA
+    not_before: datetime
+    not_after: datetime
+    issuer: str
+    subject: str
+    subject_alternative_names: List[str] = Field(default_factory=list)
+    
+    # CA-specific metadata
+    ca_provider: CAProvider
+    certificate_profile: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class RevocationRequest(BaseModel):
+    """Request to revoke a certificate."""
+    serial_number: str
+    reason: str = "unspecified"  # RFC 5280 revocation reasons
+    revocation_date: Optional[datetime] = None
+
+
+class RevocationResponse(BaseModel):
+    """Response from certificate revocation."""
+    serial_number: str
+    revoked: bool
+    revocation_date: datetime
+    reason: str
+    crl_generated: Optional[bool] = None
+    ocsp_updated: Optional[bool] = None
+
+
+class CAStatus(BaseModel):
+    """CA provider status."""
+    provider: CAProvider
+    healthy: bool
+    version: Optional[str] = None
+    last_checked: datetime = Field(default_factory=datetime.utcnow)
+    message: Optional[str] = None
+    
+    # CA-specific status
+    ca_certificates: List[str] = Field(default_factory=list)
+    crl_next_update: Optional[datetime] = None
+    ocsp_responder_url: Optional[str] = None
+
+
+class CAChainResponse(BaseModel):
+    """CA certificate chain."""
+    provider: CAProvider
+    ca_certificates: List[str] = Field(default_factory=list)  # PEM encoded, root last
+    root_certificate: Optional[str] = None
+    intermediate_certificates: List[str] = Field(default_factory=list)
+
+
+class ProviderConfig(BaseModel):
+    """Configuration for a CA provider."""
+    provider: CAProvider
+    name: str
+    enabled: bool = True
+    priority: int = 100  # Lower = higher priority
+    config: Dict[str, Any] = Field(default_factory=dict)
+    
+    # Connection settings
+    base_url: Optional[str] = None
+    auth_type: str = "token"  # token, certificate, userpass, iam
+    credentials: Dict[str, str] = Field(default_factory=dict)
+    
+    # Defaults
+    default_certificate_profile: Optional[str] = None
+    default_validity_days: int = 365
+    max_validity_days: Optional[int] = None
+    
+    # Capabilities override
+    allowed_operations: List[CAOperation] = Field(default_factory=list)
+    denied_operations: List[CAOperation] = Field(default_factory=list)
+
+
+class CapabilityCheck(BaseModel):
+    """Check if a provider supports an operation."""
+    provider: CAProvider
+    operation: CAOperation
+    supported: bool
+    reason: Optional[str] = None
+    alternatives: List[str] = Field(default_factory=list)

@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cert-api-spire
+  namespace: pki
+  labels:
+    app: cert-api-spire
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cert-api-spire
+  template:
+    metadata:
+      labels:
+        app: cert-api-spire
+        app.kubernetes.io/part-of: machine-identity-platform
+    spec:
+      serviceAccountName: spire-cert-api
+      containers:
+      - name: cert-api
+        image: 10.42.0.88:5000/cert-api:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://certapi:certinventory-password-change-me@pki-database:5432/certinventory"
+        - name: SPIFFE_SOCKET_PATH
+          value: /spiffe-socket/socket
+        volumeMounts:
+        - name: spiffe-socket
+          mountPath: /spiffe-socket
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      volumes:
+      - name: spiffe-socket
+        csi:
+          driver: "csi.spiffe.io"
+          readOnly: true

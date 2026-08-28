@@ -7,11 +7,13 @@ resources:
   - namespace.yaml
   - serviceaccount-cert-worker.yaml
   - serviceaccount-cert-api.yaml
+  - serviceaccount-spire.yaml
   - networkpolicy-default-deny.yaml
   - networkpolicy-cert-worker.yaml
   - networkpolicy-cert-api.yaml
   - database/deployment.yaml
   - cert-api/deployment.yaml
+  - cert-api/deployment-spire.yaml
   - cert-worker/deployment.yaml
   - ca-service/deploy/deployment.yaml
   - servicemonitor-cert-api.yaml

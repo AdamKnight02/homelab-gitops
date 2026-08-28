@@ -19,3 +19,4 @@ resources:
   - daemonset-agent.yaml
   - networkpolicy-server.yaml
   - networkpolicy-agent.yaml
+  - clusterspiffeid-pki.yaml

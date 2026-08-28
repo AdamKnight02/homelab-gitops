@@ -1,0 +1,19 @@
+apiVersion: spire.spiffe.io/v1alpha1
+kind: ClusterSPIFFEID
+metadata:
+  name: pki-workloads
+  namespace: spire
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  spiffeIDTemplate: "spiffe://homelab.local/ns/{{ .PodMeta.Namespace }}/sa/{{ .PodSpec.ServiceAccountName }}"
+  podSelector:
+    matchExpressions:
+    - key: app.kubernetes.io/part-of
+      operator: In
+      values:
+      - machine-identity-platform
+  workloadSelectorTemplates:
+  - "k8s:ns:{{ .PodMeta.Namespace }}"
+  - "k8s:sa:{{ .PodSpec.ServiceAccountName }}"
+  - "k8s:pod-label:app.kubernetes.io/part-of:machine-identity-platform"

@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: rabbitmq-producer
+  namespace: rabbitmq-demo
+  labels:
+    app: rabbitmq-producer
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  template:
+    metadata:
+      labels:
+        app: rabbitmq-producer
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: producer
+        image: 10.42.0.88:5000/rabbitmq-producer:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: RABBITMQ_URL
+          value: "amqp://admin:rabbitmq-admin-password-change-me@rabbitmq.rabbitmq.svc:5672/"
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi

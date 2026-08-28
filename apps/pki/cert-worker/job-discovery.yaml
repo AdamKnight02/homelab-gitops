@@ -1,0 +1,94 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: certificate-discovery-initial
+  namespace: pki
+  labels:
+    app: certificate-discovery
+    app.kubernetes.io/part-of: machine-identity-platform
+    discovery-type: initial
+spec:
+  template:
+    metadata:
+      labels:
+        app: certificate-discovery
+    spec:
+      serviceAccountName: cert-worker
+      restartPolicy: OnFailure
+      containers:
+      - name: discovery
+        image: 10.42.0.88:5000/cert-worker:latest
+        imagePullPolicy: IfNotPresent
+        command: ["python", "-c"]
+        args:
+        - |
+          import os
+          import sys
+          import httpx
+          import structlog
+          from datetime import datetime
+          
+          logger = structlog.get_logger()
+          
+          CERT_API_URL = os.getenv("CERT_API_URL", "http://cert-api:8000")
+          
+          def run_discovery():
+              try:
+                  logger.info("discovery.initial.started")
+                  
+                  # Discover from EJBCA
+                  logger.info("discovery.ejbca.started")
+                  ejbca_resp = httpx.post(
+                      f"{CERT_API_URL}/api/v1/discovery/trigger",
+                      params={"source": "ejbca"},
+                      timeout=300.0
+                  )
+                  logger.info("discovery.ejbca.completed", 
+                            status=ejbca_resp.status_code)
+                  
+                  # Discover from OpenBao
+                  logger.info("discovery.openbao.started")
+                  openbao_resp = httpx.post(
+                      f"{CERT_API_URL}/api/v1/discovery/trigger",
+                      params={"source": "openbao_pki"},
+                      timeout=300.0
+                  )
+                  logger.info("discovery.openbao.completed", 
+                            status=openbao_resp.status_code)
+                  
+                  # Discover from Kubernetes secrets
+                  logger.info("discovery.k8s.started")
+                  k8s_resp = httpx.post(
+                      f"{CERT_API_URL}/api/v1/discovery/trigger",
+                      params={"source": "kubernetes_secret"},
+                      timeout=300.0
+                  )
+                  logger.info("discovery.k8s.completed", 
+                            status=k8s_resp.status_code)
+                  
+                  # Get final stats
+                  stats_resp = httpx.get(f"{CERT_API_URL}/api/v1/stats", timeout=30.0)
+                  if stats_resp.status_code == 200:
+                      stats = stats_resp.json()
+                      logger.info("discovery.final.stats", 
+                                total=stats.get("total_certificates"),
+                                active=stats.get("active_certificates"))
+                  
+                  logger.info("discovery.initial.completed")
+                  return 0
+                  
+              except Exception as e:
+                  logger.error("discovery.initial.failed", error=str(e))
+                  return 1
+          
+          sys.exit(run_discovery())
+        env:
+        - name: CERT_API_URL
+          value: "http://cert-api:8000"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi

@@ -18,6 +18,8 @@ resources:
   - cert-worker/cronjob-renewal.yaml
   - cert-worker/cronjob-inventory.yaml
   - cert-worker/configmap-inventory.yaml
+  - cert-worker/job-discovery.yaml
+  - cert-worker/networkpolicy-discovery.yaml
   - ca-service/deploy/deployment.yaml
   - servicemonitor-cert-api.yaml
   - servicemonitor-ca-service.yaml

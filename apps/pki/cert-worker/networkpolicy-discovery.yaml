@@ -1,0 +1,56 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-discovery-egress
+  namespace: pki
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+    policy-type: discovery
+spec:
+  podSelector:
+    matchLabels:
+      app: certificate-discovery
+  policyTypes:
+  - Egress
+  egress:
+  # Allow to EJBCA
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ejbca
+    ports:
+    - protocol: TCP
+      port: 8443
+  # Allow to OpenBao
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openbao
+    ports:
+    - protocol: TCP
+      port: 8200
+  # Allow to cert-api
+  - to:
+    - podSelector:
+        matchLabels:
+          app: cert-api
+    ports:
+    - protocol: TCP
+      port: 8000
+  # Allow to Kubernetes API
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow DNS
+  - to:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53

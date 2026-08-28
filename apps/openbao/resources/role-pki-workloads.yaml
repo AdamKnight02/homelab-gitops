@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openbao-pki-roles
+  namespace: openbao
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+data:
+  pki-workload-role.json: |
+    {
+      "allowed_domains": ["pki.svc.cluster.local", "homelab.local"],
+      "allow_subdomains": true,
+      "allow_bare_domains": false,
+      "allow_glob_domains": false,
+      "allow_ip_sans": true,
+      "allow_localhost": false,
+      "allowed_uri_sans": ["spiffe://homelab.local/*"],
+      "allowed_other_sans": [],
+      "server_flag": true,
+      "client_flag": true,
+      "code_signing_flag": false,
+      "email_protection_flag": false,
+      "key_type": "rsa",
+      "key_bits": 2048,
+      "signature_algorithm": "sha256",
+      "ttl": "720h",
+      "max_ttl": "2160h",
+      "allow_any_name": false,
+      "enforce_hostnames": true,
+      "use_csr_common_name": true,
+      "use_csr_sans": true,
+      "ou": ["PKI Workloads"],
+      "organization": ["Homelab"],
+      "country": ["US"],
+      "locality": ["Lab"],
+      "province": ["Lab"],
+      "street_address": [],
+      "postal_code": [],
+      "generate_lease": true,
+      "no_store": false,
+      "require_cn": true,
+      "policy_identifiers": [],
+      "basic_constraints_valid_for_non_ca": false,
+      "not_before_duration": "30s"
+    }

@@ -5,3 +5,6 @@ namespace: openbao
 
 resources:
   - networkpolicy-allow-pki.yaml
+  - resources/policy-pki-workloads.hcl
+  - resources/role-pki-workloads.yaml
+  - resources/kubernetes-auth-pki.yaml

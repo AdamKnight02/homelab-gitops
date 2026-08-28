@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openbao-kubernetes-auth-pki
+  namespace: openbao
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+data:
+  auth-config.json: |
+    {
+      "kubernetes_host": "https://kubernetes.default.svc",
+      "kubernetes_ca_cert": "@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+      "token_reviewer_jwt": "@/var/run/secrets/kubernetes.io/serviceaccount/token",
+      "issuer": "https://kubernetes.default.svc.cluster.local"
+    }
+  role-config.json: |
+    {
+      "bound_service_account_names": ["cert-api", "cert-worker", "ca-service", "spire-cert-api", "spire-cert-worker", "spire-ca-service"],
+      "bound_service_account_namespaces": ["pki"],
+      "policies": ["pki-workloads", "lab-policy"],
+      "ttl": "1h",
+      "max_ttl": "24h",
+      "num_uses": 0
+    }

@@ -19,3 +19,5 @@ resources:
   - servicemonitor-cert-api.yaml
   - servicemonitor-ca-service.yaml
   - prometheusrules-pki.yaml
+  - networkpolicy-mtls.yaml
+  - certificates-mtls.yaml

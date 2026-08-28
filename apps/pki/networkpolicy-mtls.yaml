@@ -1,0 +1,78 @@
+# NetworkPolicy enforcing mTLS for PKI service mesh
+# Only allows traffic from workloads with valid SPIFFE identities
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-pki-mtls
+  namespace: pki
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+    policy-type: mtls
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: machine-identity-platform
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow from same namespace (intra-PKI communication)
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: machine-identity-platform
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 5432
+  # Allow from cert-manager namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: cert-manager
+    ports:
+    - protocol: TCP
+      port: 8000
+  # Allow from spire namespace (for CSI driver)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: spire
+    ports:
+    - protocol: TCP
+      port: 8000
+  egress:
+  # Allow to database
+  - to:
+    - podSelector:
+        matchLabels:
+          app: pki-database
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow to EJBCA
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ejbca
+    ports:
+    - protocol: TCP
+      port: 8443
+  # Allow to OpenBao
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openbao
+    ports:
+    - protocol: TCP
+      port: 8200
+  # Allow DNS
+  - to:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53

@@ -13,7 +13,7 @@ resources:
   - networkpolicy-cert-api.yaml
   - database/deployment.yaml
   - cert-api/deployment.yaml
-  # - cert-api/deployment-spire.yaml  # Disabled - CSI driver not installed
+  - cert-api/deployment-spire.yaml
   - cert-worker/deployment.yaml
   - cert-worker/cronjob-renewal.yaml
   - cert-worker/configmap-renewal.yaml

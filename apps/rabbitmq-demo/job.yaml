@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: rabbitmq-producer
+  name: rabbitmq-producer-v2
   namespace: rabbitmq-demo
   labels:
     app: rabbitmq-producer

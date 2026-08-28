@@ -1,0 +1,12 @@
+[Unit]
+Description=Ensure K3s pods are running after boot
+After=k3s.service
+Wants=k3s.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/k3s-pod-watcher.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

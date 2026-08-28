@@ -27,8 +27,6 @@ from cryptography.hazmat.primitives import hashes, serialization
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 
-# Add shared models to path
-sys.path.insert(0, '/app/shared')
 from models import (
     CertificateRecord,
     DiscoverySource,
@@ -196,7 +194,7 @@ class EJBCADiscovery(CertificateDiscovery):
     """Discover certificates from EJBCA."""
     
     def __init__(self):
-        super().____(DiscoverySource.EJBCA)
+        super().__init__(DiscoverySource.EJBCA)
         self.base_url = EJBCA_URL
         self.auth = (EJBCA_USERNAME, EJBCA_PASSWORD) if EJBCA_USERNAME else None
     

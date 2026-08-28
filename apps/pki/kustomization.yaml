@@ -34,7 +34,7 @@ resources:
   - ca-service/deploy/deployment.yaml
   - servicemonitor-cert-api.yaml
   - servicemonitor-ca-service.yaml
-  - prometheusrules-pki.yaml
+  # - prometheusrules-pki.yaml  # Disabled - requires custom metrics
   - networkpolicy-mtls.yaml
   - networkpolicy-hardened.yaml
   - certificates-mtls.yaml

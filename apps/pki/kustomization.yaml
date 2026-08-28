@@ -23,13 +23,13 @@ resources:
   - cert-worker/cronjob-pqc-scan.yaml
   - cert-worker/configmap-pqc.yaml
   - cert-worker/cronjob-backup.yaml
-  - cert-worker/job-restore.yaml
+  # - cert-worker/job-restore.yaml           # Disabled - run manually for DR only
   # - cert-worker/job-failure-test.yaml      # Disabled - cert-api not fully deployed
   # - cert-worker/cronjob-failure-test.yaml  # Disabled - cert-api not fully deployed
   - pvc-backup.yaml
   - cert-worker/cronjob-inventory.yaml
   - cert-worker/configmap-inventory.yaml
-  - cert-worker/job-discovery.yaml
+  # - cert-worker/job-discovery.yaml         # Disabled - run manually after cert-api is ready
   - cert-worker/networkpolicy-discovery.yaml
   - ca-service/deploy/deployment.yaml
   - servicemonitor-cert-api.yaml

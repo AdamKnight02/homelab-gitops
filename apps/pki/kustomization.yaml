@@ -38,5 +38,5 @@ resources:
   - networkpolicy-mtls.yaml
   - networkpolicy-hardened.yaml
   - certificates-mtls.yaml
-  - podsecuritypolicy.yaml
-  - kyverno-policies.yaml
+  # - podsecuritypolicy.yaml  # Disabled - requires PSP admission controller
+  # - kyverno-policies.yaml   # Disabled - requires Kyverno installation

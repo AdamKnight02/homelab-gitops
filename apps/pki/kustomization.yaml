@@ -31,4 +31,7 @@ resources:
   - servicemonitor-ca-service.yaml
   - prometheusrules-pki.yaml
   - networkpolicy-mtls.yaml
+  - networkpolicy-hardened.yaml
   - certificates-mtls.yaml
+  - podsecuritypolicy.yaml
+  - kyverno-policies.yaml

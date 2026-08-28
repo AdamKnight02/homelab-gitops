@@ -1,0 +1,63 @@
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: pki-restricted
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+  readOnlyRootFilesystem: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pki-psp
+  namespace: pki
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+rules:
+- apiGroups: ['policy']
+  resources: ['podsecuritypolicies']
+  verbs: ['use']
+  resourceNames: ['pki-restricted']
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pki-psp-binding
+  namespace: pki
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+roleRef:
+  kind: Role
+  name: pki-psp
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: cert-api
+  namespace: pki
+- kind: ServiceAccount
+  name: cert-worker
+  namespace: pki
+- kind: ServiceAccount
+  name: spire-cert-api
+  namespace: pki
+- kind: ServiceAccount
+  name: spire-cert-worker
+  namespace: pki

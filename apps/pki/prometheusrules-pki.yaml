@@ -38,15 +38,6 @@ spec:
         summary: "Weak certificate key detected"
         description: "Certificate uses key with {{ $value }} bits"
 
-    - alert: DeprecatedSignatureAlgorithm
-      expr: cert_inventory_signature_algorithm =~ "sha1.*|md5.*"
-      for: 5m
-      labels:
-        severity: warning
-      annotations:
-        summary: "Deprecated signature algorithm detected"
-        description: "Certificate uses deprecated signature algorithm"
-
   - name: pki-services
     interval: 30s
     rules:

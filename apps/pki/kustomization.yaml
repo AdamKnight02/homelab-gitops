@@ -16,6 +16,8 @@ resources:
   - cert-api/deployment-spire.yaml
   - cert-worker/deployment.yaml
   - cert-worker/cronjob-renewal.yaml
+  - cert-worker/cronjob-inventory.yaml
+  - cert-worker/configmap-inventory.yaml
   - ca-service/deploy/deployment.yaml
   - servicemonitor-cert-api.yaml
   - servicemonitor-ca-service.yaml

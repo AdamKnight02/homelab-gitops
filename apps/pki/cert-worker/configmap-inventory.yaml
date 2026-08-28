@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: crypto-inventory-config
+  namespace: pki
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+data:
+  inventory-config.yaml: |
+    discovery:
+      sources:
+        - name: ejbca
+          enabled: true
+          type: rest_api
+          url: "https://ejbca-ejbca-ce:8443/ejbca"
+          schedule: "0 */6 * * *"
+          
+        - name: openbao_pki
+          enabled: true
+          type: vault_api
+          url: "https://openbao:8200"
+          mount_path: "pki"
+          schedule: "0 */6 * * *"
+          
+        - name: kubernetes_secret
+          enabled: true
+          type: k8s_api
+          namespaces:
+            - pki
+            - cert-manager
+            - openbao
+            - ejbca
+          secret_types:
+            - kubernetes.io/tls
+          schedule: "0 */6 * * *"
+          
+        - name: cert_manager
+          enabled: true
+          type: k8s_api
+          crd_types:
+            - certificates.cert-manager.io
+          schedule: "0 */6 * * *"
+          
+        - name: tls_scan
+          enabled: false
+          type: network_scan
+          targets:
+            - "ejbca-ejbca-ce:443"
+            - "openbao:8200"
+            - "cert-api:8000"
+          schedule: "0 0 * * 0"  # Weekly
+    
+    crypto_policy:
+      minimum_key_sizes:
+        RSA: 2048
+        ECDSA: 256
+        Ed25519: 256
+      
+      allowed_signature_algorithms:
+        - sha256WithRSAEncryption
+        - sha384WithRSAEncryption
+        - sha512WithRSAEncryption
+        - ecdsa-with-SHA256
+        - ecdsa-with-SHA384
+        - ecdsa-with-SHA512
+        - ed25519
+      
+      blocked_signature_algorithms:
+        - sha1WithRSAEncryption
+        - md5WithRSAEncryption
+      
+      pqc_requirements:
+        minimum_rsa_size: 3072
+        minimum_ecdsa_size: 384
+        require_hybrid: false
+    
+    alerting:
+      expiring_threshold_days: 30
+      critical_expiring_days: 7
+      stale_threshold_days: 7

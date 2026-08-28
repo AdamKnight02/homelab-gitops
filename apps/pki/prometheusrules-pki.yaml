@@ -12,51 +12,46 @@ spec:
     interval: 60s
     rules:
     - alert: CertificateExpiringSoon
-      expr: |
-        cert_inventory_days_remaining < 30
+      expr: cert_inventory_days_remaining < 30
       for: 5m
       labels:
         severity: warning
       annotations:
         summary: "Certificate expiring soon"
-        description: "Certificate {{ $labels.hostname }} expires in {{ $value }} days"
+        description: "Certificate expires in {{ $value }} days"
 
     - alert: CertificateExpired
-      expr: |
-        cert_inventory_days_remaining < 0
+      expr: cert_inventory_days_remaining < 0
       for: 1m
       labels:
         severity: critical
       annotations:
         summary: "Certificate has expired"
-        description: "Certificate {{ $labels.hostname }} expired {{ $value }} days ago"
+        description: "Certificate expired {{ $value }} days ago"
 
     - alert: WeakCertificateKey
-      expr: |
-        cert_inventory_key_size < 2048
+      expr: cert_inventory_key_size < 2048
       for: 5m
       labels:
         severity: warning
       annotations:
         summary: "Weak certificate key detected"
-        description: "Certificate {{ $labels.hostname }} uses key with {{ $labels.key_size }} bits"
+        description: "Certificate uses key with {{ $value }} bits"
 
     - alert: DeprecatedSignatureAlgorithm
-      expr: |
-        cert_inventory_signature_algorithm =~ "sha1.*|md5.*"
+      expr: cert_inventory_signature_algorithm =~ "sha1.*|md5.*"
       for: 5m
       labels:
         severity: warning
       annotations:
         summary: "Deprecated signature algorithm detected"
-        description: "Certificate {{ $labels.hostname }} uses deprecated signature algorithm"
+        description: "Certificate uses deprecated signature algorithm"
 
   - name: pki-services
     interval: 30s
     rules:
     - alert: CertAPIHighErrorRate
-      expr: |
-        rate(cert_api_requests_total{status=~"5.."}[5m]) > 0.1
+      expr: rate(cert_api_requests_total{status=~"5.."}[5m]) > 0.1
       for: 5m
       labels:
         severity: warning
@@ -65,8 +60,7 @@ spec:
         description: "Cert API error rate is {{ $value }} errors/sec"
 
     - alert: CertAPIDown
-      expr: |
-        up{job="cert-api"} == 0
+      expr: up{job="cert-api"} == 0
       for: 1m
       labels:
         severity: critical
@@ -75,8 +69,7 @@ spec:
         description: "Cert API has been down for more than 1 minute"
 
     - alert: CAServiceDown
-      expr: |
-        up{job="ca-service"} == 0
+      expr: up{job="ca-service"} == 0
       for: 1m
       labels:
         severity: critical

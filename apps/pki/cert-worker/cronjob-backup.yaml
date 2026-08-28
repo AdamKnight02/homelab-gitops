@@ -1,0 +1,127 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cert-inventory-backup
+  namespace: pki
+  labels:
+    app: cert-inventory-backup
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  schedule: "0 1 * * *"  # Daily at 1 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      labels:
+        app: cert-inventory-backup
+    spec:
+      template:
+        spec:
+          serviceAccountName: cert-worker
+          restartPolicy: OnFailure
+          containers:
+          - name: backup
+            image: 10.42.0.88:5000/cert-worker:latest
+            imagePullPolicy: IfNotPresent
+            command: ["python", "-c"]
+            args:
+            - |
+              import os
+              import sys
+              import json
+              import gzip
+              import structlog
+              from datetime import datetime
+              from sqlalchemy import create_engine, text
+              
+              logger = structlog.get_logger()
+              
+              DATABASE_URL = os.getenv(
+                  "DATABASE_URL",
+                  "postgresql://certapi:certinventory-password-change-me@pki-database:5432/certinventory"
+              )
+              BACKUP_PATH = os.getenv("BACKUP_PATH", "/backup")
+              
+              def create_backup():
+                  try:
+                      logger.info("backup.started")
+                      
+                      engine = create_engine(DATABASE_URL)
+                      
+                      timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+                      backup_file = f"{BACKUP_PATH}/cert_inventory_{timestamp}.json.gz"
+                      
+                      # Export certificates
+                      with engine.connect() as conn:
+                          result = conn.execute(text("""
+                              SELECT * FROM certificates
+                              ORDER BY created_at DESC
+                          """))
+                          
+                          certificates = []
+                          for row in result.mappings():
+                              cert = dict(row)
+                              # Convert datetime objects to strings
+                              for key in list(cert.keys()):
+                                  if isinstance(cert[key], datetime):
+                                      cert[key] = cert[key].isoformat()
+                              certificates.append(cert)
+                      
+                      # Export discovery jobs
+                      with engine.connect() as conn:
+                          result = conn.execute(text("SELECT * FROM discovery_jobs"))
+                          jobs = [dict(row) for row in result.mappings()]
+                      
+                      # Export discovery runs
+                      with engine.connect() as conn:
+                          result = conn.execute(text("SELECT * FROM discovery_runs"))
+                          runs = [dict(row) for row in result.mappings()]
+                      
+                      backup_data = {
+                          "metadata": {
+                              "version": "1.0",
+                              "timestamp": datetime.utcnow().isoformat(),
+                              "source": "cert-inventory-backup"
+                          },
+                          "certificates": certificates,
+                          "discovery_jobs": jobs,
+                          "discovery_runs": runs
+                      }
+                      
+                      # Write compressed backup
+                      with gzip.open(backup_file, 'wt') as f:
+                          json.dump(backup_data, f, indent=2)
+                      
+                      logger.info("backup.completed",
+                                file=backup_file,
+                                certificates=len(certificates),
+                                jobs=len(jobs),
+                                runs=len(runs))
+                      
+                      return 0
+                      
+                  except Exception as e:
+                      logger.error("backup.failed", error=str(e))
+                      return 1
+              
+              sys.exit(create_backup())
+            env:
+            - name: DATABASE_URL
+              value: "postgresql://certapi:certinventory-password-change-me@pki-database:5432/certinventory"
+            - name: BACKUP_PATH
+              value: "/backup"
+            volumeMounts:
+            - name: backup-volume
+              mountPath: /backup
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 256Mi
+          volumes:
+          - name: backup-volume
+            persistentVolumeClaim:
+              claimName: cert-inventory-backup

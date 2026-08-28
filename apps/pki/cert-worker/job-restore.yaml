@@ -1,0 +1,113 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cert-inventory-restore
+  namespace: pki
+  labels:
+    app: cert-inventory-restore
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  template:
+    metadata:
+      labels:
+        app: cert-inventory-restore
+    spec:
+      serviceAccountName: cert-worker
+      restartPolicy: OnFailure
+      containers:
+      - name: restore
+        image: 10.42.0.88:5000/cert-worker:latest
+        imagePullPolicy: IfNotPresent
+        command: ["python", "-c"]
+        args:
+        - |
+          import os
+          import sys
+          import json
+          import gzip
+          import structlog
+          from datetime import datetime
+          from sqlalchemy import create_engine, text
+          
+          logger = structlog.get_logger()
+          
+          DATABASE_URL = os.getenv(
+              "DATABASE_URL",
+              "postgresql://certapi:certinventory-password-change-me@pki-database:5432/certinventory"
+          )
+          BACKUP_FILE = os.getenv("BACKUP_FILE", "/backup/latest.json.gz")
+          
+          def restore_backup():
+              try:
+                  logger.info("restore.started", file=BACKUP_FILE)
+                  
+                  # Read backup file
+                  with gzip.open(BACKUP_FILE, 'rt') as f:
+                      backup_data = json.load(f)
+                  
+                  engine = create_engine(DATABASE_URL)
+                  
+                  metadata = backup_data.get("metadata", {})
+                  certificates = backup_data.get("certificates", [])
+                  
+                  logger.info("restore.data_loaded",
+                            version=metadata.get("version"),
+                            timestamp=metadata.get("timestamp"),
+                            certificates=len(certificates))
+                  
+                  # Restore certificates
+                  with engine.connect() as conn:
+                      for cert in certificates:
+                          # Insert or update
+                          insert_stmt = text("""
+                              INSERT INTO certificates (
+                                  id, hostname, application, service, environment,
+                                  certificate_subject, subject_alternative_names,
+                                  serial_number, issuer, key_algorithm, key_size,
+                                  signature_algorithm, not_before, not_after,
+                                  status, source_ca, pem_certificate, metadata
+                              ) VALUES (
+                                  :id, :hostname, :application, :service, :environment,
+                                  :certificate_subject, :subject_alternative_names,
+                                  :serial_number, :issuer, :key_algorithm, :key_size,
+                                  :signature_algorithm, :not_before, :not_after,
+                                  :status, :source_ca, :pem_certificate, :metadata
+                              )
+                              ON CONFLICT (serial_number) DO UPDATE SET
+                                  hostname = EXCLUDED.hostname,
+                                  status = EXCLUDED.status,
+                                  last_seen = CURRENT_TIMESTAMP
+                          """)
+                          conn.execute(insert_stmt, cert)
+                      
+                      conn.commit()
+                  
+                  logger.info("restore.completed",
+                            certificates_restored=len(certificates))
+                  
+                  return 0
+                  
+              except Exception as e:
+                  logger.error("restore.failed", error=str(e))
+                  return 1
+          
+          sys.exit(restore_backup())
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://certapi:certinventory-password-change-me@pki-database:5432/certinventory"
+        - name: BACKUP_FILE
+          value: "/backup/latest.json.gz"
+        volumeMounts:
+        - name: backup-volume
+          mountPath: /backup
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+      volumes:
+      - name: backup-volume
+        persistentVolumeClaim:
+          claimName: cert-inventory-backup

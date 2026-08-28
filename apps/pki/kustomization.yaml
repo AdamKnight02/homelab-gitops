@@ -22,6 +22,9 @@ resources:
   - cert-worker/cronjob-policy-check.yaml
   - cert-worker/cronjob-pqc-scan.yaml
   - cert-worker/configmap-pqc.yaml
+  - cert-worker/cronjob-backup.yaml
+  - cert-worker/job-restore.yaml
+  - pvc-backup.yaml
   - cert-worker/cronjob-inventory.yaml
   - cert-worker/configmap-inventory.yaml
   - cert-worker/job-discovery.yaml

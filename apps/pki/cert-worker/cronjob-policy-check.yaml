@@ -1,0 +1,171 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cert-policy-check
+  namespace: pki
+  labels:
+    app: cert-policy-check
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  schedule: "0 3 * * *"  # Daily at 3 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      labels:
+        app: cert-policy-check
+    spec:
+      template:
+        spec:
+          serviceAccountName: cert-worker
+          restartPolicy: OnFailure
+          containers:
+          - name: policy-check
+            image: 10.42.0.88:5000/cert-worker:latest
+            imagePullPolicy: IfNotPresent
+            command: ["python", "-c"]
+            args:
+            - |
+              import os
+              import sys
+              import yaml
+              import httpx
+              import structlog
+              from datetime import datetime
+              
+              logger = structlog.get_logger()
+              
+              CERT_API_URL = os.getenv("CERT_API_URL", "http://cert-api:8000")
+              
+              def load_policies():
+                  try:
+                      with open("/config/policies.yaml") as f:
+                          config = yaml.safe_load(f)
+                          return config.get("policies", [])
+                  except Exception as e:
+                      logger.error("policy.load.failed", error=str(e))
+                      return []
+              
+              def evaluate_certificate(cert, policies):
+                  violations = []
+                  
+                  for policy in policies:
+                      if not policy.get("enabled", False):
+                          continue
+                      
+                      for rule in policy.get("rules", []):
+                          rule_type = rule.get("type")
+                          
+                          # Key size check
+                          if rule_type == "key_size":
+                              algo = cert.get("key_algorithm")
+                              size = cert.get("key_size", 0)
+                              algo_config = rule.get("algorithms", {}).get(algo, {})
+                              minimum = algo_config.get("minimum", 0)
+                              
+                              if size < minimum:
+                                  violations.append({
+                                      "policy": policy["name"],
+                                      "severity": policy["severity"],
+                                      "message": f"Key size {size} for {algo} below minimum {minimum}",
+                                      "action": rule.get("action", "warn")
+                                  })
+                          
+                          # Signature algorithm check
+                          elif rule_type == "signature_algorithm":
+                              sig = cert.get("signature_algorithm", "")
+                              if sig in rule.get("blocked", []):
+                                  violations.append({
+                                      "policy": policy["name"],
+                                      "severity": policy["severity"],
+                                      "message": f"Blocked signature algorithm: {sig}",
+                                      "action": rule.get("action", "warn")
+                                  })
+                          
+                          # Validity period check
+                          elif rule_type == "validity_period":
+                              from datetime import datetime
+                              not_before = cert.get("not_before")
+                              not_after = cert.get("not_after")
+                              if not_before and not_after:
+                                  days = (not_after - not_before).days
+                                  max_days = rule.get("maximum_days", 398)
+                                  if days > max_days:
+                                      violations.append({
+                                          "policy": policy["name"],
+                                          "severity": policy["severity"],
+                                          "message": f"Validity period {days} days exceeds maximum {max_days}",
+                                          "action": rule.get("action", "warn")
+                                      })
+                  
+                  return violations
+              
+              def run_policy_check():
+                  try:
+                      logger.info("policy.check.started")
+                      
+                      policies = load_policies()
+                      if not policies:
+                          logger.warning("policy.no_policies_loaded")
+                          return 0
+                      
+                      # Get all certificates
+                      resp = httpx.get(
+                          f"{CERT_API_URL}/api/v1/certificates",
+                          params={"limit": 1000},
+                          timeout=60.0
+                      )
+                      resp.raise_for_status()
+                      certs = resp.json().get("certificates", [])
+                      
+                      total_checked = 0
+                      total_violations = 0
+                      critical_violations = 0
+                      
+                      for cert in certs:
+                          violations = evaluate_certificate(cert, policies)
+                          total_checked += 1
+                          
+                          if violations:
+                              total_violations += len(violations)
+                              for v in violations:
+                                  if v["severity"] == "critical":
+                                      critical_violations += 1
+                                  
+                                  logger.warning("policy.violation",
+                                               serial=cert.get("serial_number"),
+                                               policy=v["policy"],
+                                               severity=v["severity"],
+                                               message=v["message"],
+                                               action=v["action"])
+                      
+                      logger.info("policy.check.completed",
+                                total_checked=total_checked,
+                                total_violations=total_violations,
+                                critical_violations=critical_violations)
+                      
+                      return 0
+                      
+                  except Exception as e:
+                      logger.error("policy.check.failed", error=str(e))
+                      return 1
+              
+              sys.exit(run_policy_check())
+            env:
+            - name: CERT_API_URL
+              value: "http://cert-api:8000"
+            volumeMounts:
+            - name: policy-config
+              mountPath: /config
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 256Mi
+          volumes:
+          - name: policy-config
+            configMap:
+              name: cert-policy-engine

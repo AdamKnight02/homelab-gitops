@@ -13,6 +13,13 @@ spec:
   - Egress
   egress:
   - to:
+    - podSelector:
+        matchLabels:
+          app: pki-database
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: spire

@@ -15,6 +15,7 @@ spec:
     metadata:
       labels:
         app: cert-api
+        app.kubernetes.io/part-of: machine-identity-platform
     spec:
       serviceAccountName: cert-api
       containers:

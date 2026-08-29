@@ -9,7 +9,7 @@ multiple CA providers.
 from typing import List, Optional, Dict, Any
 from enum import Enum
 
-from models import (
+from app.models import (
     CAProvider,
     CAOperation,
     CAProviderCapabilities,

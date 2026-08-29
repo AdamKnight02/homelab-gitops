@@ -9,7 +9,7 @@ from typing import List, Optional, Dict, Any
 
 import httpx
 
-from models import (
+from app.models import (
     CAProvider,
     CAOperation,
     CAProviderCapabilities,

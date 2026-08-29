@@ -26,7 +26,7 @@ spec:
           protocol: TCP
         env:
         - name: DATABASE_URL
-          value: "postgresql://certapi:certinventory-password-change-me@pki-database:5432/certinventory"
+          value: "postgresql://certapi:certinventory-password-change-me@pki-database:5432/certapi"
         resources:
           requests:
             cpu: 100m

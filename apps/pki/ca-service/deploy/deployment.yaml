@@ -20,7 +20,7 @@ spec:
       containers:
       - name: ca-service
         image: 10.43.164.190:5000/ca-service:latest
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         ports:
         - containerPort: 8000
           protocol: TCP
@@ -31,6 +31,8 @@ spec:
           value: "https://ejbca-ejbca-ce:8443/ejbca"
         - name: OPENBAO_URL
           value: "https://openbao:8200"
+        - name: PYTHONPATH
+          value: "/app/app"
         resources:
           requests:
             cpu: 100m

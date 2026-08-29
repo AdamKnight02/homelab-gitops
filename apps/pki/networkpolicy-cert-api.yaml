@@ -20,6 +20,13 @@ spec:
     - protocol: TCP
       port: 5432
   - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: machine-identity-platform
+    ports:
+    - protocol: TCP
+      port: 8000
+  - to:
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: spire

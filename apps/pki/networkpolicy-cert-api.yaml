@@ -22,14 +22,14 @@ spec:
   - to:
     - podSelector:
         matchLabels:
-          app: cert-api
+          app.kubernetes.io/part-of: machine-identity-platform
     ports:
     - protocol: TCP
       port: 8000
   - to:
     - podSelector:
         matchLabels:
-          app: ca-service
+          app.kubernetes.io/part-of: machine-identity-platform
     ports:
     - protocol: TCP
       port: 8080

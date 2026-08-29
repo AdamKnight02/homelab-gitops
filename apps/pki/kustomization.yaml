@@ -8,7 +8,7 @@ resources:
   - serviceaccount-cert-worker.yaml
   - serviceaccount-cert-api.yaml
   - serviceaccount-spire.yaml
-  - networkpolicy-default-deny.yaml
+  # - networkpolicy-default-deny.yaml  # Disabled - blocks all traffic by default
   - networkpolicy-cert-worker.yaml
   - networkpolicy-cert-api.yaml
   - database/deployment.yaml

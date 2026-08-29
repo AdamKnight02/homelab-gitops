@@ -20,7 +20,7 @@ spec:
       serviceAccountName: cert-api
       containers:
       - name: cert-api
-        image: 10.43.164.190:5000/cert-api:latest
+        image: 192.168.122.74:30500/cert-api:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000

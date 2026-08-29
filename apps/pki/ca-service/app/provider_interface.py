@@ -8,7 +8,7 @@ Abstract base class that all CA providers must implement.
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any
 
-from app.models import (
+from models import (
     CAProvider,
     CAOperation,
     CAProviderCapabilities,

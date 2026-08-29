@@ -13,7 +13,7 @@ import structlog
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.models import (
+from models import (
     CAProvider,
     CAOperation,
     CAProviderCapabilities,

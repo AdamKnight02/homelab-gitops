@@ -1,58 +1,85 @@
-# Cloud-Neutral Reference Architecture
+# Cloud Reference Architecture
 
-> **Purpose**: Define the logical architecture that is portable across homelab, Azure, and AWS.
+> **Status**: Logical reference architecture for multi-cloud PKI platform
 
-## Design Philosophy
-
-The PKI platform is designed to be **cloud-neutral** at the workload layer. The only provider-specific components are:
-
-1. **Infrastructure layer** (VM, network, IAM) — Terraform handles this
-2. **Bootstrap layer** (cloud-init) — provider-specific metadata/APIs
-3. **Identity integration** — SPIFFE complements cloud-native identity
-
-All platform components run identically in K3s on any Linux VM.
-
-## Logical Architecture
+## High-Level Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                      Client / Application                    │
-└──────────────────────────┬──────────────────────────────────┘
-                           │ mTLS
-                           ▼
+│                                                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
+│  │   Web App   │  │   Mobile    │  │     Service         │ │
+│  │             │  │    App      │  │    (mTLS)           │ │
+│  └──────┬──────┘  └──────┬──────┘  └──────────┬──────────┘ │
+│         │                │                    │            │
+│         └────────────────┼────────────────────┘            │
+│                          │                                 │
+│                          ▼                                 │
+│  ┌─────────────────────────────────────────────────────┐  │
+│  │              Certificate API (REST)                  │  │
+│  │         Authentication / Authorization               │  │
+│  │              (SPIFFE / Kubernetes)                   │  │
+│  └─────────────────────────┬───────────────────────────┘  │
+│                            │                               │
+└────────────────────────────┼───────────────────────────────┘
+                             │
+                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                   Certificate API (cert-api)                 │
-│              REST/gRPC → AuthN/AuthZ → Policy               │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
+│                      Message Queue (RabbitMQ)               │
+│                                                              │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │              certificate_requests queue              │   │
+│  │              certificate_renewals queue              │   │
+│  │              certificate_revocations queue           │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                            │                                │
+└────────────────────────────┼───────────────────────────────┘
+                             │
+                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                      RabbitMQ (AMQP)                         │
-│              Async queue for certificate jobs                │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
+│                    Certificate Worker                       │
+│                                                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
+│  │   Request   │  │   Renewal   │  │     Revocation      │ │
+│  │  Processor  │  │  Processor  │  │     Processor       │ │
+│  └──────┬──────┘  └──────┬──────┘  └──────────┬──────────┘ │
+│         │                │                    │            │
+│         └────────────────┼────────────────────┘            │
+│                          │                                 │
+│                          ▼                                 │
+│  ┌─────────────────────────────────────────────────────┐  │
+│  │              CA Abstraction Layer                    │  │
+│  │         (EJBCA / OpenBao / External CA)             │  │
+│  └─────────────────────────┬───────────────────────────┘  │
+│                            │                               │
+└────────────────────────────┼───────────────────────────────┘
+                             │
+                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                  Certificate Worker (cert-worker)            │
-│              Processes queue → calls CA abstraction          │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
+│                         EJBCA PKI                           │
+│                                                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
+│  │   Root CA   │  │  Issuing CA │  │   Certificate       │ │
+│  │             │  │             │  │   Profiles          │ │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘ │
+│                                                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
+│  │    OCSP     │  │    CRL      │  │   Crypto Tokens     │ │
+│  │  Responder  │  │  Distribution│  │   (HSM/Software)    │ │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘ │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+                             │
+                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              CA Abstraction Layer (ca-service)               │
-│              Unified interface to multiple CAs               │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      EJBCA (PKI Core)                        │
-│              Root CA / Issuing CA / OCSP / CRL               │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    PostgreSQL (Database)                     │
-│              CA data, certificate inventory, audit           │
+│                      PostgreSQL Database                     │
+│                                                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
+│  │  EJBCA Data │  │   Audit     │  │   Inventory         │ │
+│  │             │  │    Log      │  │   (Certificates)    │ │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘ │
+│                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -60,103 +87,130 @@ All platform components run identically in K3s on any Linux VM.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    SPIRE / SPIFFE                            │
-│  Workload identity → SVIDs → mTLS between services          │
+│                    Workload Identity (SPIRE)                │
+│                                                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
+│  │ SPIRE Server│  │ SPIRE Agent │  │   OIDC Discovery    │ │
+│  │ (StatefulSet)│  │ (DaemonSet) │  │   Provider          │ │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘ │
+│                                                              │
+│  SPIFFE IDs:                                                 │
+│  - spiffe://pki-cloudlab.local/ns/pki/sa/cert-api          │
+│  - spiffe://pki-cloudlab.local/ns/pki/sa/cert-worker       │
+│  - spiffe://pki-cloudlab.local/ns/pki/sa/ca-service        │
+│                                                              │
 └─────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
-│                      OpenBao (Secrets)                       │
-│  Secret storage, PKI engine, KV, dynamic credentials        │
+│                   Secrets Management (OpenBao)              │
+│                                                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
+│  │  PKI Engine │  │   KV Store  │  │  Kubernetes Auth    │ │
+│  │             │  │             │  │                     │ │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘ │
+│                                                              │
 └─────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
-│                  cert-manager (Kubernetes)                   │
-│  Automatic TLS for ingress and internal services            │
+│                  Certificate Management (cert-manager)      │
+│                                                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
+│  │   Issuer    │  │ Certificate │  │   ClusterIssuer     │ │
+│  │             │  │             │  │                     │ │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘ │
+│                                                              │
 └─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│              Prometheus + Grafana (Observability)            │
-│  Metrics, alerting, dashboards                              │
-└─────────────────────────────────────────────────────────────┘
 ```
 
-## Certificate Lifecycle
+## Data Flow
+
+### Certificate Issuance
 
 ```
-Request → Validate → Queue → Process → Issue → Store → Inventory → Audit
-   │         │        │         │        │       │         │         │
-   ▼         ▼        ▼         ▼        ▼       ▼         ▼         ▼
- cert-api  AuthN   RabbitMQ  Worker   EJBCA  K8s Secret  DB      OpenBao
-           AuthZ                      CA     / OpenBao           Audit Log
+1. Client → cert-api (HTTP/REST)
+2. cert-api → AuthN/AuthZ (SPIFFE verification)
+3. cert-api → RabbitMQ (queue request)
+4. cert-worker ← RabbitMQ (consume request)
+5. cert-worker → CA Abstraction Layer
+6. CA Abstraction → EJBCA (issue certificate)
+7. EJBCA → PostgreSQL (store certificate data)
+8. cert-worker → Inventory (store certificate metadata)
+9. cert-worker → Audit (log event)
+10. cert-worker → RabbitMQ (notify completion)
+11. cert-api ← RabbitMQ (return certificate to client)
 ```
 
-## Portability Matrix
+### Certificate Renewal
 
-| Component | Homelab | Azure | AWS | Notes |
-|-----------|---------|-------|-----|-------|
-| **Infrastructure** | libvirt/KVM | Terraform + VM | Terraform + EC2 | Provider-specific |
-| **Network** | LAN bridge | VNet + NSG | VPC + SG | Different names, same concepts |
-| **Compute** | Red Hat VM | Ubuntu VM | Amazon Linux | All run K3s |
-| **Kubernetes** | K3s | K3s | K3s | **Identical** |
-| **GitOps** | Argo CD | Argo CD | Argo CD | **Identical** |
-| **PKI Core** | EJBCA | EJBCA | EJBCA | **Identical** (containerized) |
-| **Database** | PostgreSQL | PostgreSQL | PostgreSQL | **Identical** (containerized) |
-| **Secrets** | OpenBao | OpenBao | OpenBao | **Identical** (containerized) |
-| **Identity** | SPIRE | SPIRE | SPIRE | **Identical** (containerized) |
-| **Queue** | RabbitMQ | RabbitMQ | RabbitMQ | **Identical** (containerized) |
-| **API** | cert-api | cert-api | cert-api | **Identical** (containerized) |
-| **Worker** | cert-worker | cert-worker | cert-worker | **Identical** (containerized) |
-| **Monitoring** | Prometheus/Grafana | Prometheus/Grafana | Prometheus/Grafana | **Identical** |
-| **Registry** | Docker Registry | Docker Registry | Docker Registry | **Identical** |
+```
+1. cert-api (monitor) detects expiry
+2. cert-api → RabbitMQ (queue renewal)
+3. cert-worker ← RabbitMQ (process renewal)
+4. cert-worker → CA Abstraction (reissue)
+5. CA Abstraction → EJBCA (new certificate)
+6. cert-worker → Inventory (update record)
+7. cert-worker → Audit (log renewal)
+```
 
-## Cloud-Native Integration Points
+### Certificate Revocation
 
-While the core platform is cloud-neutral, these integration points are provider-specific:
+```
+1. Admin → cert-api (revocation request)
+2. cert-api → RabbitMQ (queue revocation)
+3. cert-worker ← RabbitMQ (process revocation)
+4. cert-worker → CA Abstraction (revoke)
+5. CA Abstraction → EJBCA (update CRL)
+6. cert-worker → Inventory (update status)
+7. cert-worker → Audit (log revocation)
+8. EJBCA publishes updated CRL
+```
 
-### Azure
-- **Managed Identity**: Can authenticate to Azure Key Vault (if used alongside OpenBao)
-- **Azure AD**: Can be identity provider for Argo CD SSO
-- **Azure Monitor**: Can collect metrics from Prometheus
-- **Azure DNS**: Can be used for ACME DNS-01 challenges
+## Component Responsibilities
 
-### AWS
-- **IAM Roles**: Instance profile provides AWS API access
-- **AWS Secrets Manager**: Can be used alongside OpenBao
-- **CloudWatch**: Can collect metrics from Prometheus
-- **Route 53**: Can be used for ACME DNS-01 challenges
+| Component | Responsibility | Technology |
+|-----------|---------------|------------|
+| cert-api | REST API for certificate operations | Python/FastAPI |
+| cert-worker | Background processing | Python/Celery |
+| CA Abstraction | Unified CA interface | Python library |
+| EJBCA | Certificate issuance | Java/Tomcat |
+| PostgreSQL | Data persistence | PostgreSQL 15 |
+| RabbitMQ | Message queuing | RabbitMQ 3.12 |
+| OpenBao | Secrets management | OpenBao 2.0 |
+| SPIRE | Workload identity | SPIRE 1.8 |
+| cert-manager | TLS automation | cert-manager 1.14 |
+| Argo CD | GitOps | Argo CD 2.11 |
+| K3s | Kubernetes | K3s 1.30 |
 
-### Homelab
-- **Local DNS**: Internal DNS resolution
-- **Local CA**: EJBCA issues all certificates
-- **No cloud IAM**: SPIFFE is the primary identity system
+## Scaling Considerations
 
-## Design Decisions
+### Horizontal Scaling
 
-### Why K3s instead of managed Kubernetes?
+```
+cert-api: 2+ replicas (load balanced)
+cert-worker: 2+ replicas (queue consumers)
+EJBCA: 1 replica (stateful, can cluster)
+PostgreSQL: 1 replica (can use HA setup)
+RabbitMQ: 3 replicas (cluster for HA)
+```
 
-| Factor | K3s | AKS/EKS |
-|--------|-----|---------|
-| Cost | Free | $72+/mo |
-| Complexity | Low | High |
-| Learning | Full control | Abstracted |
-| Portability | Runs anywhere | Provider-specific |
-| Similarity to homelab | Identical | Different |
+### Resource Requirements
 
-### Why VM instead of container platforms?
+| Component | CPU | Memory | Storage |
+|-----------|-----|--------|---------|
+| K3s | 1 | 2GB | 20GB |
+| EJBCA | 1 | 2GB | 10GB |
+| PostgreSQL | 0.5 | 1GB | 10GB |
+| RabbitMQ | 0.5 | 1GB | 5GB |
+| cert-api | 0.25 | 256MB | — |
+| cert-worker | 0.25 | 256MB | — |
+| OpenBao | 0.5 | 512MB | 5GB |
+| SPIRE | 0.25 | 256MB | 1GB |
+| **Total** | **~4** | **~8GB** | **~50GB** |
 
-| Factor | VM + K3s | ACI/ECS/Fargate |
-|--------|----------|-----------------|
-| Cost | Low | Higher |
-| Stateful workloads | Easy | Hard |
-| EJBCA requirements | Full OS access | Limited |
-| Learning | Complete stack | Abstracted |
+## Cloud Portability
 
-### Why OpenBao instead of cloud-native secrets?
-
-| Factor | OpenBao | Azure Key Vault / AWS Secrets Manager |
-|--------|---------|--------------------------------------|
-| Portability | Runs anywhere | Provider-specific |
-| PKI engine | Built-in | Limited or absent |
-| SPIFFE integration | Native | Requires bridging |
-| Cost | Free | Per-operation |
-| Learning | Complete | Abstracted |
+All components are containerized and deployed via Kubernetes manifests, making them portable across:
+- Local homelab (K3s on libvirt VM)
+- Azure (K3s on Azure VM)
+- AWS (K3s on EC2)
+- Any other Kubernetes cluster

@@ -1,0 +1,49 @@
+# Azure Cloud Overlay
+# Azure VM + K3s deployment
+# Optimized for cloud resource constraints
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: azure-overlay
+  annotations:
+    environment: azure
+    description: "Azure cloud K3s overlay"
+    cloud-provider: azure
+
+# Reference to base
+resources:
+  - ../../base
+
+# Azure-specific patches
+patches:
+  # Reduce replica counts for cost optimization
+  - target:
+      kind: Deployment
+      name: ca-service
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target:
+      kind: Deployment
+      name: cert-api
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+
+commonLabels:
+  environment: azure
+  cluster: k3s-azure
+  cloud-provider: azure
+
+# Azure-specific configurations
+configMapGenerator:
+  - name: cloud-config
+    literals:
+      - CLOUD_PROVIDER=azure
+      - STORAGE_CLASS=managed-premium
+      - INGRESS_CLASS=nginx
+      - DNS_ZONE=azure.pki.local

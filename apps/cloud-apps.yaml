@@ -1,0 +1,69 @@
+# Argo CD ApplicationSet for Cloud Environments
+# Deploys the Machine Identity Platform to Azure and AWS K3s clusters
+# Uses the App of Apps pattern with environment-specific overlays
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cloud-pki-platform
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: cloud-pki-platform
+    app.kubernetes.io/part-of: machine-identity-platform
+    app.kubernetes.io/managed-by: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - name: azure
+            environment: azure
+            cluster: https://k3s-azure.pki.local:6443
+            overlay: overlays/azure
+            enabled: "true"
+          - name: aws
+            environment: aws
+            cluster: https://k3s-aws.pki.local:6443
+            overlay: overlays/aws
+            enabled: "true"
+  template:
+    metadata:
+      name: "pki-{{name}}"
+      namespace: argocd
+      labels:
+        app.kubernetes.io/name: "pki-{{name}}"
+        app.kubernetes.io/part-of: machine-identity-platform
+        environment: "{{environment}}"
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/AdamKnight02/homelab-gitops.git
+        targetRevision: main
+        path: "apps/{{overlay}}"
+      destination:
+        server: "{{cluster}}"
+        namespace: pki
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+          allowEmpty: false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground
+          - PruneLast=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+      ignoreDifferences:
+        - group: apps
+          kind: Deployment
+          jsonPointers:
+            - /spec/replicas
+  # Only deploy if enabled
+  # Note: Argo CD doesn't natively support conditional generators
+  # Use kubectl patch or Argo CD CLI to disable specific environments

@@ -1,0 +1,49 @@
+# AWS Cloud Overlay
+# AWS EC2 + K3s deployment
+# Optimized for free-tier resource constraints
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: aws-overlay
+  annotations:
+    environment: aws
+    description: "AWS cloud K3s overlay"
+    cloud-provider: aws
+
+# Reference to base
+resources:
+  - ../../base
+
+# AWS-specific patches
+patches:
+  # Single replica for free-tier cost optimization
+  - target:
+      kind: Deployment
+      name: ca-service
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target:
+      kind: Deployment
+      name: cert-api
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+
+commonLabels:
+  environment: aws
+  cluster: k3s-aws
+  cloud-provider: aws
+
+# AWS-specific configurations
+configMapGenerator:
+  - name: cloud-config
+    literals:
+      - CLOUD_PROVIDER=aws
+      - STORAGE_CLASS=gp2
+      - INGRESS_CLASS=nginx
+      - DNS_ZONE=aws.pki.local

@@ -21,6 +21,9 @@
     {
       "Effect": "Allow",
       "Action": [
+        "iam:ListRolePolicies",
+        "iam:ListAttachedRolePolicies",
+        "iam:GetRolePolicy",
         "ec2:*",
         "iam:GetRole",
         "iam:CreateRole",

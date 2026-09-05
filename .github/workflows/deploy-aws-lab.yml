@@ -1,0 +1,63 @@
+name: Deploy AWS Lab
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment"
+        required: true
+        default: "lab"
+
+      instance_type:
+        description: "EC2 instance type"
+        required: true
+        default: "t3.micro"
+
+      root_volume_size:
+        description: "Root volume size in GB"
+        required: true
+        default: "20"
+
+      aws_region:
+        description: "AWS region"
+        required: true
+        default: "us-east-1"
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    defaults:
+      run:
+        working-directory: infra/terraform/aws
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: |
+          terraform plan \
+            -var="environment=${{ inputs.environment }}" \
+            -var="instance_type=${{ inputs.instance_type }}" \
+            -var="root_volume_size=${{ inputs.root_volume_size }}" \
+            -var="aws_region=${{ inputs.aws_region }}"

@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VM Configuration Metadata",
+  "description": "Schema for VM configuration metadata in the PKI platform",
+  "type": "object",
+  "required": ["version", "customer", "environment", "role"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Configuration schema version",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "customer": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Customer identifier",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Customer display name"
+        }
+      }
+    },
+    "environment": {
+      "type": "string",
+      "description": "Deployment environment",
+      "enum": ["dev", "staging", "prod"]
+    },
+    "role": {
+      "type": "string",
+      "description": "VM role",
+      "enum": ["gateway", "pki", "scep", "acme", "kubernetes", "monitoring"]
+    },
+    "os": {
+      "type": "string",
+      "description": "Operating system",
+      "enum": ["windows", "linux"]
+    },
+    "baseline": {
+      "type": "object",
+      "properties": {
+        "security": { "type": "boolean", "default": true },
+        "tls": { "type": "boolean", "default": true },
+        "logging": { "type": "boolean", "default": true }
+      }
+    },
+    "config": {
+      "type": "object",
+      "description": "Role-specific configuration",
+      "additionalProperties": true
+    },
+    "secrets": {
+      "type": "object",
+      "description": "References to secrets (not actual secrets)",
+      "properties": {
+        "keyvault": { "type": "string" },
+        "openbao_path": { "type": "string" }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "properties": {
+        "smoke_tests": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "health_check_endpoint": { "type": "string" }
+      }
+    }
+  }
+}

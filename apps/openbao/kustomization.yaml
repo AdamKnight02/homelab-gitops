@@ -5,6 +5,8 @@ namespace: openbao
 
 resources:
   - networkpolicy-allow-pki.yaml
-  - resources/policy-pki-workloads.hcl
   - resources/role-pki-workloads.yaml
   - resources/kubernetes-auth-pki.yaml
+
+# Note: resources/policy-pki-workloads.hcl is an OpenBao policy file
+# It is applied via OpenBao CLI/API, not Kubernetes

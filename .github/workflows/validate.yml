@@ -1,0 +1,345 @@
+name: Validate
+
+on:
+  workflow_dispatch:
+    inputs:
+      cloud_provider:
+        description: 'Cloud provider to validate'
+        required: true
+        type: choice
+        options:
+          - azure
+          - aws
+          - all
+      customer_name:
+        description: 'Customer name (used for tfvars path, no hardcoding)'
+        required: false
+        type: string
+        default: ''
+  workflow_call:
+    inputs:
+      cloud_provider:
+        required: true
+        type: string
+      customer_name:
+        required: false
+        type: string
+        default: ''
+  push:
+    branches: [main]
+    paths:
+      - 'infra/terraform/**'
+      - 'configuration/**'
+      - '.github/workflows/validate.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'infra/terraform/**'
+      - 'configuration/**'
+
+env:
+  TF_VERSION: '1.9.8'
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Terraform Format Check
+  # ──────────────────────────────────────────────
+  terraform-fmt:
+    name: Terraform Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format Check
+        run: |
+          echo "Checking Terraform formatting across all modules..."
+          terraform fmt -check -recursive infra/terraform/
+          if [ $? -ne 0 ]; then
+            echo "::error::Terraform files are not properly formatted. Run 'terraform fmt -recursive infra/terraform/'"
+            exit 1
+          fi
+          echo "✅ All Terraform files properly formatted"
+
+  # ──────────────────────────────────────────────
+  # Terraform Validate (per provider)
+  # ──────────────────────────────────────────────
+  terraform-validate:
+    name: Terraform Validate (${{ matrix.provider }})
+    runs-on: ubuntu-latest
+    needs: terraform-fmt
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [azure, aws]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Init (backend=false)
+        working-directory: infra/terraform/${{ matrix.provider }}
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        working-directory: infra/terraform/${{ matrix.provider }}
+        run: |
+          terraform validate
+          if [ $? -ne 0 ]; then
+            echo "::error::Terraform validation failed for ${{ matrix.provider }}"
+            exit 1
+          fi
+          echo "✅ Terraform validation passed for ${{ matrix.provider }}"
+
+  # ──────────────────────────────────────────────
+  # YAML Lint
+  # ──────────────────────────────────────────────
+  yaml-lint:
+    name: YAML Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Create yamllint config
+        run: |
+          cat > /tmp/.yamllint << 'EOF'
+          extends: default
+          rules:
+            line-length:
+              max: 200
+              level: warning
+            truthy:
+              level: warning
+            document-start:
+              present: false
+            indentation:
+              spaces: 2
+            comments:
+              min-spaces-from-content: 1
+          EOF
+
+      - name: Lint YAML files
+        run: |
+          echo "Linting YAML files..."
+          FAILED=0
+
+          # Lint Kubernetes manifests
+          find apps/ -name "*.yaml" -o -name "*.yml" | while read file; do
+            yamllint -c /tmp/.yamllint "$file" || FAILED=1
+          done
+
+          # Lint ArgoCD applications
+          find infrastructure/ -name "*.yaml" -o -name "*.yml" | while read file; do
+            yamllint -c /tmp/.yamllint "$file" || FAILED=1
+          done
+
+          # Lint configuration files
+          find configuration/ -name "*.yaml" -o -name "*.yml" 2>/dev/null | while read file; do
+            yamllint -c /tmp/.yamllint "$file" || FAILED=1
+          done
+
+          # Lint workflow files
+          find .github/workflows/ -name "*.yml" -o -name "*.yaml" | while read file; do
+            yamllint -c /tmp/.yamllint -d relaxed "$file" || FAILED=1
+          done
+
+          echo "✅ YAML lint complete"
+
+  # ──────────────────────────────────────────────
+  # Kubernetes Manifest Validation
+  # ──────────────────────────────────────────────
+  k8s-validate:
+    name: K8s Manifest Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.31.0'
+
+      - name: Setup kustomize
+        run: |
+          curl -sLo /tmp/kustomize.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz
+          tar -xzf /tmp/kustomize.tar.gz -C /tmp
+          sudo mv /tmp/kustomize /usr/local/bin/
+          kustomize version
+
+      - name: Validate Kustomize builds
+        run: |
+          FAILED=0
+          for kustomization in $(find . -name "kustomization.yaml" -not -path "./.git/*"); do
+            dir=$(dirname "$kustomization")
+            echo "Building kustomization in $dir..."
+            kustomize build "$dir" > /dev/null 2>&1 || {
+              echo "::error::Kustomize build failed in $dir"
+              FAILED=1
+            }
+          done
+          if [ $FAILED -eq 1 ]; then
+            exit 1
+          fi
+          echo "✅ All Kustomize builds successful"
+
+      - name: Dry-run validate manifests
+        run: |
+          FAILED=0
+          for kustomization in $(find . -name "kustomization.yaml" -not -path "./.git/*"); do
+            dir=$(dirname "$kustomization")
+            echo "Dry-run validating $dir..."
+            kustomize build "$dir" | kubectl apply --dry-run=client --validate=false -f - 2>&1 || true
+            # Note: --validate=false because CRDs may not exist in validation cluster
+          done
+          echo "✅ Manifest dry-run validation complete"
+
+  # ──────────────────────────────────────────────
+  # Schema Validation (configuration schemas)
+  # ──────────────────────────────────────────────
+  schema-validate:
+    name: Schema Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: pip install pyyaml jsonschema
+
+      - name: Validate configuration schemas
+        run: |
+          python3 << 'PYEOF'
+          import yaml
+          import os
+          import sys
+
+          errors = []
+
+          # Validate all YAML files are parseable
+          for root, dirs, files in os.walk('.'):
+              if '.git' in root or '.terraform' in root:
+                  continue
+              for f in files:
+                  if f.endswith(('.yaml', '.yml')):
+                      filepath = os.path.join(root, f)
+                      try:
+                          with open(filepath) as fh:
+                              list(yaml.safe_load_all(fh))
+                      except yaml.YAMLError as e:
+                          errors.append(f"YAML parse error in {filepath}: {e}")
+
+          # Validate configuration directory structure
+          expected_dirs = ['configuration/linux', 'configuration/windows', 'configuration/schemas']
+          for d in expected_dirs:
+              if not os.path.isdir(d):
+                  errors.append(f"Missing expected directory: {d}")
+
+          # Validate terraform module structure
+          for provider in ['azure', 'aws']:
+              tf_dir = f'infra/terraform/{provider}'
+              required_files = ['main.tf', 'variables.tf', 'outputs.tf', 'providers.tf']
+              for rf in required_files:
+                  if not os.path.isfile(os.path.join(tf_dir, rf)):
+                      errors.append(f"Missing {rf} in {tf_dir}")
+
+          if errors:
+              for e in errors:
+                  print(f"::error::{e}")
+              sys.exit(1)
+          else:
+              print("✅ All schema validations passed")
+          PYEOF
+
+  # ──────────────────────────────────────────────
+  # Security: Check for hardcoded secrets
+  # ──────────────────────────────────────────────
+  secrets-scan:
+    name: Secrets Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan for hardcoded secrets
+        run: |
+          FAILED=0
+
+          # Check for common secret patterns (excluding examples)
+          PATTERNS=(
+            'password\s*[:=]\s*["'\''][^"'\'']+["'\'']'
+            'api_key\s*[:=]\s*["'\''][^"'\'']+["'\'']'
+            'secret_key\s*[:=]\s*["'\''][^"'\'']+["'\'']'
+            'private_key\s*[:=]\s*["'\''][^"'\'']+["'\'']'
+            'BEGIN (RSA|EC|DSA|OPENSSH) PRIVATE KEY'
+            'AKIA[0-9A-Z]{16}'
+          )
+
+          for pattern in "${PATTERNS[@]}"; do
+            matches=$(grep -rPn "$pattern" \
+              --include="*.yaml" --include="*.yml" --include="*.tf" \
+              --include="*.py" --include="*.sh" --include="*.json" \
+              --exclude-dir=.git --exclude-dir=.terraform \
+              --exclude="*.example" --exclude="*.md" \
+              . 2>/dev/null | grep -v "password-change-me" | grep -v "your-key-here" | grep -v "example" || true)
+            if [ -n "$matches" ]; then
+              echo "::warning::Potential secrets found matching pattern '$pattern':"
+              echo "$matches"
+              FAILED=1
+            fi
+          done
+
+          if [ $FAILED -eq 1 ]; then
+            echo "::error::Potential hardcoded secrets detected. Review warnings above."
+            exit 1
+          fi
+          echo "✅ No hardcoded secrets detected"
+
+  # ──────────────────────────────────────────────
+  # Summary
+  # ──────────────────────────────────────────────
+  validation-summary:
+    name: Validation Summary
+    runs-on: ubuntu-latest
+    needs: [terraform-fmt, terraform-validate, yaml-lint, k8s-validate, schema-validate, secrets-scan]
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          FAILED=0
+          for job in terraform-fmt terraform-validate yaml-lint k8s-validate schema-validate secrets-scan; do
+            echo "Checking $job..."
+          done
+
+          echo "## Validation Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Terraform Format | ${{ needs.terraform-fmt.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Terraform Validate | ${{ needs.terraform-validate.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| YAML Lint | ${{ needs.yaml-lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| K8s Manifests | ${{ needs.k8s-validate.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Schema Validation | ${{ needs.schema-validate.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secrets Scan | ${{ needs.secrets-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+
+          # Fail if any job failed
+          for result in "${{ needs.terraform-fmt.result }}" "${{ needs.terraform-validate.result }}" \
+                         "${{ needs.yaml-lint.result }}" "${{ needs.k8s-validate.result }}" \
+                         "${{ needs.schema-validate.result }}" "${{ needs.secrets-scan.result }}"; do
+            if [ "$result" = "failure" ]; then
+              FAILED=1
+            fi
+          done
+
+          if [ $FAILED -eq 1 ]; then
+            echo "::error::One or more validation checks failed"
+            exit 1
+          fi
+          echo "✅ All validations passed"

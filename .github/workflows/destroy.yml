@@ -1,0 +1,331 @@
+name: Destroy Customer Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      cloud_provider:
+        description: 'Cloud provider'
+        required: true
+        type: choice
+        options:
+          - azure
+          - aws
+      customer_name:
+        description: 'Customer name (must match the workspace to destroy)'
+        required: true
+        type: string
+      environment:
+        description: 'Environment to destroy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+      tfvars_file:
+        description: 'Path to tfvars file (relative to provider dir)'
+        required: false
+        type: string
+        default: 'terraform.tfvars'
+      confirm_destroy:
+        description: 'Type "DESTROY" to confirm teardown'
+        required: true
+        type: string
+
+env:
+  TF_VERSION: '1.9.8'
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Confirmation Gate
+  # ──────────────────────────────────────────────
+  confirm:
+    name: "⚠️ Confirm Destruction"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Confirmation
+        run: |
+          if [ "${{ inputs.confirm_destroy }}" != "DESTROY" ]; then
+            echo "::error::You must type 'DESTROY' to confirm environment teardown."
+            echo "::error::Received: '${{ inputs.confirm_destroy }}'"
+            exit 1
+          fi
+          echo "✅ Destruction confirmed by ${{ github.actor }}"
+
+      - name: Safety Check — Production Warning
+        if: inputs.environment == 'production'
+        run: |
+          echo "::warning::⚠️  You are about to destroy a PRODUCTION environment!"
+          echo "::warning::Customer: ${{ inputs.customer_name }}"
+          echo "::warning::This action is IRREVERSIBLE."
+
+      - name: Record Intent
+        run: |
+          echo "## Destruction Request" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Requested By | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Customer | ${{ inputs.customer_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | ${{ inputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Provider | ${{ inputs.cloud_provider }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Confirmation | ${{ inputs.confirm_destroy }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Timestamp | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+
+  # ──────────────────────────────────────────────
+  # Approval Gate (always required for destroy)
+  # ──────────────────────────────────────────────
+  approval:
+    name: "🔐 Destruction Approval"
+    runs-on: ubuntu-latest
+    needs: [confirm]
+    environment:
+      name: ${{ inputs.environment }}
+    steps:
+      - name: Approval Granted
+        run: |
+          echo "Destruction approved by ${{ github.actor }}"
+          echo "## Destruction Approved" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Approved by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Customer:** ${{ inputs.customer_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+
+  # ──────────────────────────────────────────────
+  # Pre-Destroy: Backup State
+  # ──────────────────────────────────────────────
+  backup-state:
+    name: "💾 Backup State"
+    runs-on: ubuntu-latest
+    needs: [approval]
+    env:
+      TF_DIR: infra/terraform/${{ inputs.cloud_provider }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Azure Login
+        if: inputs.cloud_provider == 'azure'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: AWS Credentials
+        if: inputs.cloud_provider == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform init -input=false
+
+      - name: Select Workspace
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          WORKSPACE="${{ inputs.customer_name }}-${{ inputs.environment }}"
+          terraform workspace select "$WORKSPACE"
+          echo "Selected workspace: $WORKSPACE"
+
+      - name: Backup State and Outputs
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          echo "Backing up Terraform state and outputs before destruction..."
+
+          # Save outputs
+          terraform output -json > /tmp/pre_destroy_outputs.json 2>/dev/null || echo "{}" > /tmp/pre_destroy_outputs.json
+
+          # Save state list
+          terraform state list > /tmp/pre_destroy_state_list.txt 2>/dev/null || echo "No state" > /tmp/pre_destroy_state_list.txt
+
+          # Save full state pull
+          terraform state pull > /tmp/pre_destroy_state.json 2>/dev/null || echo "{}" > /tmp/pre_destroy_state.json
+
+          echo "State backup complete"
+          echo "Resources in state:"
+          cat /tmp/pre_destroy_state_list.txt
+
+      - name: Upload State Backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: state-backup-${{ inputs.cloud_provider }}-${{ inputs.customer_name }}-${{ inputs.environment }}-${{ github.run_id }}
+          path: |
+            /tmp/pre_destroy_outputs.json
+            /tmp/pre_destroy_state_list.txt
+            /tmp/pre_destroy_state.json
+          retention-days: 90
+
+  # ──────────────────────────────────────────────
+  # Destroy
+  # ──────────────────────────────────────────────
+  destroy:
+    name: "💥 Destroy (${{ inputs.cloud_provider }} / ${{ inputs.customer_name }})"
+    runs-on: ubuntu-latest
+    needs: [backup-state]
+    env:
+      TF_DIR: infra/terraform/${{ inputs.cloud_provider }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: true
+
+      - name: Azure Login
+        if: inputs.cloud_provider == 'azure'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: AWS Credentials
+        if: inputs.cloud_provider == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform init -input=false
+
+      - name: Select Workspace
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          WORKSPACE="${{ inputs.customer_name }}-${{ inputs.environment }}"
+          terraform workspace select "$WORKSPACE"
+
+      - name: Terraform Destroy
+        id: destroy
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          TFVARS_ARG=""
+          if [ -f "${{ inputs.tfvars_file }}" ]; then
+            TFVARS_ARG="-var-file=${{ inputs.tfvars_file }}"
+          fi
+
+          terraform destroy \
+            -input=false \
+            -no-color \
+            -auto-approve \
+            $TFVARS_ARG \
+            2>&1 | tee destroy_output.txt
+
+          EXITCODE=${PIPESTATUS[0]}
+          if [ $EXITCODE -ne 0 ]; then
+            echo "::error::Terraform destroy failed with exit code $EXITCODE"
+            exit $EXITCODE
+          fi
+          echo "✅ Terraform destroy completed"
+
+      - name: Upload Destroy Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: destroy-log-${{ inputs.cloud_provider }}-${{ inputs.customer_name }}-${{ inputs.environment }}
+          path: ${{ env.TF_DIR }}/destroy_output.txt
+          retention-days: 90
+          if-no-files-found: ignore
+
+  # ──────────────────────────────────────────────
+  # Post-Destroy: Cleanup Workspace
+  # ──────────────────────────────────────────────
+  cleanup:
+    name: "🧹 Cleanup"
+    runs-on: ubuntu-latest
+    needs: [destroy]
+    if: needs.destroy.result == 'success'
+    env:
+      TF_DIR: infra/terraform/${{ inputs.cloud_provider }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Azure Login
+        if: inputs.cloud_provider == 'azure'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: AWS Credentials
+        if: inputs.cloud_provider == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform init -input=false
+
+      - name: Delete Workspace
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          WORKSPACE="${{ inputs.customer_name }}-${{ inputs.environment }}"
+
+          # Switch to default first
+          terraform workspace select default
+
+          # Delete the customer workspace
+          terraform workspace delete "$WORKSPACE" || echo "::warning::Could not delete workspace $WORKSPACE"
+
+          echo "Workspace cleanup complete"
+
+  # ──────────────────────────────────────────────
+  # Final Summary
+  # ──────────────────────────────────────────────
+  destroy-summary:
+    name: "📋 Destruction Summary"
+    runs-on: ubuntu-latest
+    needs: [confirm, approval, backup-state, destroy, cleanup]
+    if: always()
+    steps:
+      - name: Generate Summary
+        run: |
+          echo "# Environment Destruction Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Customer | **${{ inputs.customer_name }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | **${{ inputs.environment }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cloud Provider | **${{ inputs.cloud_provider }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "| Destroyed By | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Timestamp | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Stages" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Confirmation | ${{ needs.confirm.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Approval | ${{ needs.approval.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| State Backup | ${{ needs.backup-state.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Destroy | ${{ needs.destroy.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cleanup | ${{ needs.cleanup.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.destroy.result }}" = "success" ]; then
+            echo "**Result:** 💥 Environment **${{ inputs.customer_name }}-${{ inputs.environment }}** has been destroyed." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Result:** ❌ Destruction failed. Review logs for details." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi

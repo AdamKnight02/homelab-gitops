@@ -1,0 +1,131 @@
+# Customer Configuration Schema v1
+# Cloud-agnostic PKI platform customer definition
+# This schema defines the contract between customer intent and provider implementation
+
+schema_version: 1
+
+# Customer identity
+customer:
+  id: string                    # Short identifier (lowercase, alphanumeric, hyphens)
+  name: string                  # Display name
+  environment: enum             # dev | staging | prod
+  data_classification: enum     # public | internal | confidential | restricted
+
+# Cloud provider selection (abstracted)
+cloud:
+  provider: enum                # azure | aws | alibaba
+  region: string                # Provider-specific region identifier
+  availability_zones: integer   # Number of AZs for HA (default: 2)
+
+# Network configuration (logical)
+network:
+  cidr: string                  # Primary CIDR block (e.g., "10.50.0.0/16")
+  subnets:
+    management:
+      cidr: string              # e.g., "10.50.0.0/24"
+      access: enum              # private | public_gateway
+    pki:
+      cidr: string              # e.g., "10.50.1.0/24"
+      access: enum              # private
+    enrollment:
+      cidr: string              # e.g., "10.50.2.0/24"
+      access: enum              # private | public_gateway
+
+# Gateway / ingress configuration
+gateway:
+  enabled: boolean
+  count: integer                # Number of gateway instances
+  size_class: enum              # small | medium | large
+  public_access: boolean        # Whether gateway has public IP
+  tls_termination: boolean      # Terminate TLS at gateway
+
+# PKI core infrastructure
+pki:
+  count: integer                # Number of PKI VMs (CA, OCSP, CRL)
+  size_class: enum              # small | medium | large
+  ha_mode: enum                 # active_passive | active_active
+  backup_enabled: boolean
+  hsm_type: enum                # software | cloud_hsm | dedicated_hsm
+
+# SCEP service
+scep:
+  enabled: boolean
+  count: integer
+  size_class: enum              # small | medium | large
+  challenge_password_required: boolean
+
+# ACME service
+acme:
+  enabled: boolean
+  count: integer
+  size_class: enum              # small | medium | large
+  directory_url: string         # ACME directory URL
+  external_account_binding: boolean
+
+# Database configuration
+database:
+  engine: enum                  # postgresql | mysql
+  size_class: enum              # small | medium | large
+  availability: enum            # single | highly_available
+  backup_retention_days: integer
+  encryption_at_rest: boolean
+
+# Storage configuration
+storage:
+  class: enum                   # standard | high_durability | archive
+  redundancy: enum              # local | zonal | regional | global
+  containers:
+    - name: string              # e.g., "crls", "backups", "logs"
+      public_access: boolean
+      retention_days: integer
+
+# Secrets management
+secrets:
+  native_cloud_store: boolean   # Use cloud-native secrets (Key Vault, Secrets Manager)
+  external_secrets_operator: boolean  # Use ESO with OpenBao
+
+# Monitoring and observability
+monitoring:
+  prometheus: boolean
+  grafana: boolean
+  alertmanager: boolean
+  log_retention_days: integer
+  metrics_retention_days: integer
+
+# GitOps configuration
+gitops:
+  enabled: boolean
+  repository: string            # Git repository URL
+  branch: string                # Branch for this customer
+  path: string                  # Path within repository
+
+# Feature flags
+features:
+  spire: boolean                # SPIFFE/SPIRE workload identity
+  openbao: boolean              # OpenBao secrets management
+  rabbitmq: boolean             # RabbitMQ message queue
+  certificate_inventory: boolean
+  ocsp_responder: boolean
+  crl_distribution: boolean
+  scep_service: boolean
+  acme_service: boolean
+
+# Compliance and security
+security:
+  pod_security_standard: enum   # privileged | baseline | restricted
+  network_policies: boolean
+  encryption_in_transit: boolean
+  encryption_at_rest: boolean
+
+# Cost optimization
+cost_optimization:
+  auto_shutdown_dev: boolean    # Shutdown dev environments outside business hours
+  spot_instances: boolean       # Use spot/preemptible instances where possible
+  reserved_instances: boolean   # Use reserved instances for prod
+
+# Tags/labels (applied to all resources)
+tags:
+  cost_center: string
+  owner: string
+  project: string
+  compliance: list[string]      # e.g., ["pci-dss", "hipaa", "soc2"]

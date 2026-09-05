@@ -1,0 +1,117 @@
+# Example customer configuration for Acme Corp
+# Development environment on Azure with cost optimization
+
+schema_version: 1
+
+customer:
+  id: acme
+  name: Acme Corporation
+  environment: dev
+  data_classification: internal
+
+cloud:
+  provider: azure
+  region: westus2
+  availability_zones: 2
+
+network:
+  cidr: 10.60.0.0/16
+  subnets:
+    management:
+      cidr: 10.60.0.0/24
+      access: private
+    pki:
+      cidr: 10.60.1.0/24
+      access: private
+    enrollment:
+      cidr: 10.60.2.0/24
+      access: private
+
+gateway:
+  enabled: true
+  count: 1
+  size_class: small
+  public_access: false
+  tls_termination: true
+
+pki:
+  count: 1
+  size_class: small
+  ha_mode: active_passive
+  backup_enabled: false
+  hsm_type: software
+
+scep:
+  enabled: true
+  count: 1
+  size_class: small
+  challenge_password_required: false
+
+acme:
+  enabled: false
+  count: 0
+  size_class: small
+  directory_url: ""
+  external_account_binding: false
+
+database:
+  engine: postgresql
+  size_class: small
+  availability: single
+  backup_retention_days: 7
+  encryption_at_rest: true
+
+storage:
+  class: standard
+  redundancy: local
+  containers:
+    - name: crls
+      public_access: false
+      retention_days: 7
+    - name: backups
+      public_access: false
+      retention_days: 7
+
+secrets:
+  native_cloud_store: true
+  external_secrets_operator: false
+
+monitoring:
+  prometheus: true
+  grafana: false
+  alertmanager: false
+  log_retention_days: 7
+  metrics_retention_days: 7
+
+gitops:
+  enabled: true
+  repository: https://github.com/AdamKnight02/homelab-gitops
+  branch: customer/acme
+  path: gitops/overlays/dev/customers/acme
+
+features:
+  spire: false
+  openbao: true
+  rabbitmq: false
+  certificate_inventory: true
+  ocsp_responder: false
+  crl_distribution: true
+  scep_service: true
+  acme_service: false
+
+security:
+  pod_security_standard: baseline
+  network_policies: true
+  encryption_in_transit: true
+  encryption_at_rest: true
+
+cost_optimization:
+  auto_shutdown_dev: true
+  spot_instances: true
+  reserved_instances: false
+
+tags:
+  cost_center: engineering
+  owner: devops-team
+  project: pki-development
+  compliance: []

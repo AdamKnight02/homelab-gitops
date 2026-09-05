@@ -1,0 +1,253 @@
+name: Terraform Apply
+
+on:
+  workflow_dispatch:
+    inputs:
+      cloud_provider:
+        description: 'Cloud provider'
+        required: true
+        type: choice
+        options:
+          - azure
+          - aws
+      customer_name:
+        description: 'Customer name (used for workspace naming)'
+        required: true
+        type: string
+      environment:
+        description: 'Deployment environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+      tfvars_file:
+        description: 'Path to tfvars file (relative to provider dir)'
+        required: false
+        type: string
+        default: 'terraform.tfvars'
+      auto_approve:
+        description: 'Skip manual approval (DANGEROUS — use only for dev)'
+        required: false
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      cloud_provider:
+        required: true
+        type: string
+      customer_name:
+        required: true
+        type: string
+      environment:
+        required: true
+        type: string
+      tfvars_file:
+        required: false
+        type: string
+        default: 'terraform.tfvars'
+      auto_approve:
+        required: false
+        type: boolean
+        default: false
+
+env:
+  TF_VERSION: '1.9.8'
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Approval Gate (for non-dev environments)
+  # ──────────────────────────────────────────────
+  approval-gate:
+    name: Approval Gate
+    runs-on: ubuntu-latest
+    if: inputs.auto_approve == false
+    environment:
+      name: ${{ inputs.environment }}
+    steps:
+      - name: Approval Record
+        run: |
+          echo "Deployment approved by ${{ github.actor }}"
+          echo "## Approval Gate" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Approved By | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Customer | ${{ inputs.customer_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | ${{ inputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Provider | ${{ inputs.cloud_provider }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Timestamp | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+
+  # ──────────────────────────────────────────────
+  # Terraform Apply
+  # ──────────────────────────────────────────────
+  apply:
+    name: Apply (${{ inputs.cloud_provider }} / ${{ inputs.customer_name }})
+    runs-on: ubuntu-latest
+    needs: [approval-gate]
+    if: always() && (needs.approval-gate.result == 'success' || inputs.auto_approve == true)
+    environment:
+      name: ${{ inputs.environment }}
+    env:
+      TF_DIR: infra/terraform/${{ inputs.cloud_provider }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: true
+
+      # ── Cloud Authentication ──
+      - name: Azure Login
+        if: inputs.cloud_provider == 'azure'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: AWS Credentials
+        if: inputs.cloud_provider == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
+
+      # ── Terraform Init ──
+      - name: Terraform Init
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform init -input=false
+
+      # ── Select Workspace ──
+      - name: Terraform Workspace
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          WORKSPACE="${{ inputs.customer_name }}-${{ inputs.environment }}"
+          terraform workspace select "$WORKSPACE" 2>/dev/null || terraform workspace new "$WORKSPACE"
+          echo "Using workspace: $WORKSPACE"
+
+      # ── Terraform Apply ──
+      - name: Terraform Apply
+        id: apply
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          TFVARS_ARG=""
+          if [ -f "${{ inputs.tfvars_file }}" ]; then
+            TFVARS_ARG="-var-file=${{ inputs.tfvars_file }}"
+          fi
+
+          terraform apply \
+            -input=false \
+            -no-color \
+            -auto-approve \
+            $TFVARS_ARG \
+            2>&1 | tee apply_output.txt
+
+          EXITCODE=${PIPESTATUS[0]}
+          if [ $EXITCODE -ne 0 ]; then
+            echo "::error::Terraform apply failed with exit code $EXITCODE"
+            exit $EXITCODE
+          fi
+          echo "✅ Terraform apply completed successfully"
+
+      # ── Capture Outputs ──
+      - name: Terraform Outputs
+        id: outputs
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          terraform output -json > tf_outputs.json
+          echo "=== Terraform Outputs ==="
+          terraform output
+          echo ""
+          echo "Outputs saved to tf_outputs.json"
+
+      - name: Upload Apply Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfapply-${{ inputs.cloud_provider }}-${{ inputs.customer_name }}-${{ inputs.environment }}
+          path: |
+            ${{ env.TF_DIR }}/apply_output.txt
+            ${{ env.TF_DIR }}/tf_outputs.json
+          retention-days: 30
+
+      # ── Apply Summary ──
+      - name: Apply Summary
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          echo "## Terraform Apply — ${{ inputs.cloud_provider }} / ${{ inputs.customer_name }} / ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ✅ Applied successfully" >> $GITHUB_STEP_SUMMARY
+          echo "**Applied by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Outputs" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          terraform output -json 2>/dev/null | python3 -c "
+          import json, sys
+          try:
+              data = json.load(sys.stdin)
+              for k, v in data.items():
+                  val = v.get('value', 'N/A') if isinstance(v, dict) else v
+                  if v.get('sensitive'):
+                      val = '***SENSITIVE***'
+                  print(f'{k} = {val}')
+          except: print('No outputs available')
+          " >> $GITHUB_STEP_SUMMARY || echo "No outputs" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # ──────────────────────────────────────────────
+  # Post-Apply Verification
+  # ──────────────────────────────────────────────
+  verify:
+    name: Post-Apply Verification
+    runs-on: ubuntu-latest
+    needs: [apply]
+    if: needs.apply.result == 'success'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Apply Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: tfapply-${{ inputs.cloud_provider }}-${{ inputs.customer_name }}-${{ inputs.environment }}
+          path: /tmp/apply-artifacts
+
+      - name: Verify Outputs
+        run: |
+          echo "## Post-Apply Verification" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f /tmp/apply-artifacts/tf_outputs.json ]; then
+            echo "Terraform outputs retrieved successfully." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            python3 -c "
+            import json
+            with open('/tmp/apply-artifacts/tf_outputs.json') as f:
+                data = json.load(f)
+            for k, v in data.items():
+                val = v.get('value', 'N/A') if isinstance(v, dict) else v
+                if isinstance(v, dict) and v.get('sensitive'):
+                    val = '***SENSITIVE***'
+                print(f'  {k}: {val}')
+            " >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "::warning::No terraform outputs found"
+            echo "No outputs file found." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Infrastructure Health Check Placeholder
+        run: |
+          echo "Running post-apply health checks..."
+          echo ""
+          echo "TODO: Add provider-specific health checks:"
+          echo "  - Azure: Verify VM is running, NSG rules applied"
+          echo "  - AWS: Verify EC2 instance state, security groups"
+          echo "  - K8s: Verify cluster connectivity, node readiness"
+          echo ""
+          echo "✅ Post-apply verification placeholder complete"

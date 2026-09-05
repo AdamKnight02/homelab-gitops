@@ -1,0 +1,340 @@
+name: Terraform Plan
+
+on:
+  workflow_dispatch:
+    inputs:
+      cloud_provider:
+        description: 'Cloud provider'
+        required: true
+        type: choice
+        options:
+          - azure
+          - aws
+      customer_name:
+        description: 'Customer name (used for workspace/tfvars naming)'
+        required: true
+        type: string
+      environment:
+        description: 'Deployment environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+      tfvars_file:
+        description: 'Path to tfvars file (relative to provider dir, e.g., terraform.tfvars)'
+        required: false
+        type: string
+        default: 'terraform.tfvars'
+      enable_cost_estimate:
+        description: 'Run Infracost cost estimation'
+        required: false
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      cloud_provider:
+        required: true
+        type: string
+      customer_name:
+        required: true
+        type: string
+      environment:
+        required: true
+        type: string
+      tfvars_file:
+        required: false
+        type: string
+        default: 'terraform.tfvars'
+      enable_cost_estimate:
+        required: false
+        type: boolean
+        default: true
+    outputs:
+      plan_exitcode:
+        description: 'Terraform plan exit code (0=no changes, 2=changes present)'
+        value: ${{ jobs.plan.outputs.plan_exitcode }}
+      has_changes:
+        description: 'Whether the plan has changes'
+        value: ${{ jobs.plan.outputs.has_changes }}
+
+env:
+  TF_VERSION: '1.9.8'
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Terraform Plan
+  # ──────────────────────────────────────────────
+  plan:
+    name: Plan (${{ inputs.cloud_provider }} / ${{ inputs.customer_name }})
+    runs-on: ubuntu-latest
+    outputs:
+      plan_exitcode: ${{ steps.plan.outputs.exitcode }}
+      has_changes: ${{ steps.plan.outputs.has_changes }}
+    env:
+      TF_DIR: infra/terraform/${{ inputs.cloud_provider }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: true
+
+      # ── Cloud Authentication ──
+      - name: Azure Login
+        if: inputs.cloud_provider == 'azure'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: AWS Credentials
+        if: inputs.cloud_provider == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
+
+      # ── Terraform Init ──
+      - name: Terraform Init
+        id: init
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform init -input=false
+
+      # ── Select/Create Workspace ──
+      - name: Terraform Workspace
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          WORKSPACE="${{ inputs.customer_name }}-${{ inputs.environment }}"
+          terraform workspace select "$WORKSPACE" 2>/dev/null || terraform workspace new "$WORKSPACE"
+          echo "Using workspace: $WORKSPACE"
+
+      # ── Terraform Plan ──
+      - name: Terraform Plan
+        id: plan
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          TFVARS_ARG=""
+          if [ -f "${{ inputs.tfvars_file }}" ]; then
+            TFVARS_ARG="-var-file=${{ inputs.tfvars_file }}"
+            echo "Using tfvars file: ${{ inputs.tfvars_file }}"
+          else
+            echo "::warning::tfvars file '${{ inputs.tfvars_file }}' not found, using defaults + env vars"
+          fi
+
+          # Run plan and capture exit code
+          terraform plan \
+            -input=false \
+            -no-color \
+            -detailed-exitcode \
+            -out=tfplan \
+            $TFVARS_ARG \
+            2>&1 | tee plan_output.txt
+
+          EXITCODE=${PIPESTATUS[0]}
+          echo "exitcode=$EXITCODE" >> $GITHUB_OUTPUT
+
+          if [ "$EXITCODE" -eq 2 ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "::notice::Plan has changes to apply"
+          elif [ "$EXITCODE" -eq 0 ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "::notice::No changes detected"
+          else
+            echo "::error::Terraform plan failed with exit code $EXITCODE"
+            exit $EXITCODE
+          fi
+
+      # ── Upload Plan Output ──
+      - name: Upload Plan JSON
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          terraform show -json tfplan > tfplan.json
+          terraform show -no-color tfplan > tfplan.txt
+
+      - name: Upload Plan Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ inputs.cloud_provider }}-${{ inputs.customer_name }}-${{ inputs.environment }}
+          path: |
+            ${{ env.TF_DIR }}/tfplan
+            ${{ env.TF_DIR }}/tfplan.json
+            ${{ env.TF_DIR }}/tfplan.txt
+            ${{ env.TF_DIR }}/plan_output.txt
+          retention-days: 7
+
+      # ── Plan Summary ──
+      - name: Plan Summary
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          echo "## Terraform Plan — ${{ inputs.cloud_provider }} / ${{ inputs.customer_name }} / ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          # Extract the plan summary line
+          grep -E "^(Plan:|No changes\.)" plan_output.txt >> $GITHUB_STEP_SUMMARY || echo "See full plan output in artifacts" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Resource Changes" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -E "^\s+(#|\+|\-|\~)" plan_output.txt | head -50 >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # ──────────────────────────────────────────────
+  # Security Scan (tfsec)
+  # ──────────────────────────────────────────────
+  security-scan:
+    name: Security Scan (tfsec)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tfsec
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: infra/terraform/${{ inputs.cloud_provider }}
+          soft_fail: false
+          format: sarif
+          output_file: tfsec-results.sarif
+          additional_args: --concise-output
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: tfsec-results.sarif
+        continue-on-error: true
+
+      - name: tfsec Summary
+        if: always()
+        run: |
+          echo "## Security Scan Results (tfsec)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Provider: **${{ inputs.cloud_provider }}**" >> $GITHUB_STEP_SUMMARY
+          echo "Customer: **${{ inputs.customer_name }}**" >> $GITHUB_STEP_SUMMARY
+          echo "Environment: **${{ inputs.environment }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "See Security tab for detailed SARIF results." >> $GITHUB_STEP_SUMMARY
+
+  # ──────────────────────────────────────────────
+  # Security Scan (Checkov — complementary)
+  # ──────────────────────────────────────────────
+  checkov-scan:
+    name: Security Scan (Checkov)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infra/terraform/${{ inputs.cloud_provider }}
+          framework: terraform
+          soft_fail: true
+          output_format: cli
+          quiet: true
+
+      - name: Checkov Summary
+        if: always()
+        run: |
+          echo "## Checkov Scan" >> $GITHUB_STEP_SUMMARY
+          echo "Checkov scan completed (soft_fail=true). Review logs above for findings." >> $GITHUB_STEP_SUMMARY
+
+  # ──────────────────────────────────────────────
+  # Cost Estimation (Infracost)
+  # ──────────────────────────────────────────────
+  cost-estimate:
+    name: Cost Estimate
+    runs-on: ubuntu-latest
+    if: inputs.enable_cost_estimate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Infracost
+        uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+        continue-on-error: true
+
+      - name: Generate Cost Estimate
+        id: infracost
+        working-directory: infra/terraform/${{ inputs.cloud_provider }}
+        run: |
+          if [ -z "${{ secrets.INFRACOST_API_KEY }}" ]; then
+            echo "::notice::INFRACOST_API_KEY not configured. Skipping cost estimation."
+            echo "cost_status=skipped" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          infracost breakdown \
+            --path . \
+            --format json \
+            --out-file /tmp/infracost.json
+
+          infracost output \
+            --path /tmp/infracost.json \
+            --format table \
+            --out-file /tmp/infracost.txt
+
+          echo "cost_status=success" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Cost Summary
+        if: always()
+        run: |
+          echo "## Cost Estimate" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f /tmp/infracost.txt ]; then
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat /tmp/infracost.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Cost estimation was skipped or failed." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "To enable: add \`INFRACOST_API_KEY\` to repository secrets." >> $GITHUB_STEP_SUMMARY
+            echo "Get a free API key at https://www.infracost.io/docs/" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload Cost Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: infracost-${{ inputs.cloud_provider }}-${{ inputs.customer_name }}-${{ inputs.environment }}
+          path: /tmp/infracost.txt
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # ──────────────────────────────────────────────
+  # Final Summary
+  # ──────────────────────────────────────────────
+  plan-summary:
+    name: Summary
+    runs-on: ubuntu-latest
+    needs: [plan, security-scan, checkov-scan]
+    if: always()
+    steps:
+      - name: Aggregate Results
+        run: |
+          echo "## Pipeline Summary — Terraform Plan" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Step | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Terraform Plan | ${{ needs.plan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| tfsec | ${{ needs.security-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Checkov | ${{ needs.checkov-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Provider | ${{ inputs.cloud_provider }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Customer | ${{ inputs.customer_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | ${{ inputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Has Changes | ${{ needs.plan.outputs.has_changes }} |" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.plan.result }}" = "failure" ]; then
+            echo "::error::Terraform plan failed"
+            exit 1
+          fi

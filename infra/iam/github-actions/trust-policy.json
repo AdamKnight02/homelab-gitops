@@ -12,7 +12,7 @@
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
         },
         "StringLike": {
-          "token.actions.githubusercontent.com:sub": "repo:AdamKnight02/homelab-gitops:*"
+          "token.actions.githubusercontent.com:sub": "repo:AdamKnight02@158077970/homelab-gitops@1336381016:*"
         }
       }
     }

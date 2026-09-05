@@ -21,24 +21,32 @@
     {
       "Effect": "Allow",
       "Action": [
-        "iam:ListRolePolicies",
-        "iam:ListAttachedRolePolicies",
-        "iam:GetRolePolicy",
         "ec2:*",
+
         "iam:GetRole",
         "iam:CreateRole",
         "iam:DeleteRole",
         "iam:TagRole",
         "iam:UntagRole",
-        "iam:PassRole",
+
+        "iam:PutRolePolicy",
+        "iam:GetRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:ListRolePolicies",
+
         "iam:AttachRolePolicy",
         "iam:DetachRolePolicy",
+        "iam:ListAttachedRolePolicies",
+        "iam:PassRole",
+
         "iam:CreateInstanceProfile",
         "iam:DeleteInstanceProfile",
         "iam:AddRoleToInstanceProfile",
         "iam:RemoveRoleFromInstanceProfile",
         "iam:GetInstanceProfile",
-        "iam:ListInstanceProfilesForRole"
+        "iam:ListInstanceProfilesForRole",
+        "iam:TagInstanceProfile",
+        "iam:UntagInstanceProfile"
       ],
       "Resource": "*"
     }

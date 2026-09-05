@@ -8,15 +8,13 @@ terraform {
     }
   }
 
-  # Local state for lab environment
-  # For production, use remote backend:
-  # backend "s3" {
-  #   bucket         = "aws s3api head-bucket --bucket tfstate-pki-lab"
-  #   key            = "aws/terraform.tfstate"
-  #   region         = "us-east-1"
-  #   dynamodb_table = "terraform-locks"
-  #   encrypt        = true
-  # }
+  backend "s3" {
+    bucket       = "homelab-terraform-state-962500057493"
+    key          = "aws/terraform.tfstate"
+    region       = "us-east-1"
+    encrypt      = true
+    use_lockfile = true
+  }
 }
 
 provider "aws" {

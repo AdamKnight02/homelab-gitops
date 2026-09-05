@@ -4,6 +4,23 @@
     {
       "Effect": "Allow",
       "Action": [
+        "s3:ListBucket",
+        "s3:GetBucketVersioning"
+      ],
+      "Resource": "arn:aws:s3:::homelab-terraform-state-962500057493"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::homelab-terraform-state-962500057493/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
         "ec2:*",
         "iam:GetRole",
         "iam:CreateRole",

@@ -5,6 +5,10 @@
 **Repository**: [AdamKnight02/homelab-gitops](https://github.com/AdamKnight02/homelab-gitops)  
 **Final Status**: AWS ✅ Stable | Azure ✅ Stable | Destroy ✅ Stable
 
+**Azure Final Results**:
+- **Run 1** (`34011952950`): ✅ **SUCCESS** — All 20 jobs passed (Validate → Plan → Apply → Configure → Smoke Tests)
+- **Run 2** (`34012173400`): ✅ **IDEMPOTENT** — Second run passed, no duplicate resources
+
 ---
 
 ## Table of Contents
@@ -513,13 +517,15 @@ AWS uses traditional access keys stored in GitHub Secrets. Future improvement: s
 | 11 | Azure Deploy | Resource group already exists | State not persisted (wrong backend) | Deleted leftover, fixed backend | `4ee3cf5` |
 | 12 | Azure Deploy | Standard_B1s not available | Capacity constraints in eastus | Changed to Standard_D2as_v7 | `bdff827` |
 | 13 | Azure Deploy | VM image incompatible | v7 sizes need gen2 image | Updated to gen2 Ubuntu | `ea742e2` |
-| 14 | AWS Deploy | `use_lockfile` unsupported | Requires TF 1.10+, pipeline has 1.9.8 | Removed from S3 backend | — |
-| 15 | AWS Deploy | t2.micro not free-tier | Account free tier doesn't cover t2 | Changed to t3.micro | `d9338f9` |
-| 16 | Destroy | No ownership verification | Safety gap | Added managed_by tag check | `2976b84` |
-| 17 | Destroy | No post-destroy verification | Safety gap | Added cloud API verification | `2976b84` |
-| 18 | Destroy | Workspace not found | Customer workspace may not exist | Added default workspace fallback | `80167d5` |
-| 19 | Destroy | AWS SG random suffix | `name_prefix` causes duplicates | Changed to static `name` | — |
-| 20 | CI | Missing `import os` | Python script in Configure step | Added import | `03759cf` |
+| 14 | Azure Deploy | ARM_* env vars not set | Job-level env vars missing | Added ARM_* at job level | — |
+| 15 | Azure Deploy | No remote backend | State not persisted between jobs | Configured azurerm backend | `4ee3cf5` |
+| 16 | AWS Deploy | `use_lockfile` unsupported | Requires TF 1.10+, pipeline has 1.9.8 | Removed from S3 backend | — |
+| 17 | AWS Deploy | t2.micro not free-tier | Account free tier doesn't cover t2 | Changed to t3.micro | `d9338f9` |
+| 18 | Destroy | No ownership verification | Safety gap | Added managed_by tag check | `2976b84` |
+| 19 | Destroy | No post-destroy verification | Safety gap | Added cloud API verification | `2976b84` |
+| 20 | Destroy | Workspace not found | Customer workspace may not exist | Added default workspace fallback | `80167d5` |
+| 21 | Destroy | AWS SG random suffix | `name_prefix` causes duplicates | Changed to static `name` | — |
+| 22 | CI | Missing `import os` | Python script in Configure step | Added import | `03759cf` |
 
 ---
 
@@ -648,9 +654,9 @@ terraform apply → reads SAME remote state → applies only changes
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Azure deploy end-to-end pass | 🔄 In progress | Backend fixed, agent still iterating |
-| Azure rerun idempotency | ⏳ Pending | Needs successful first deploy |
-| Azure destroy test | ⏳ Pending | Needs successful deploy first |
+| Azure deploy end-to-end pass | ✅ **COMPLETE** | Run `34011952950` — all 20 jobs passed |
+| Azure rerun idempotency | ✅ **COMPLETE** | Run `34012173400` — no duplicate resources |
+| Azure destroy test | ⏳ Pending | Ready to test |
 | Full lifecycle test (deploy→rerun→destroy→redeploy) | ⏳ Pending | Both providers |
 | Customer factory modules | 📋 Designed | 14 Azure modules ready, not yet used by pipeline |
 | Argo CD customer onboarding | 📋 Designed | ApplicationSet ready, not yet deployed |
@@ -678,6 +684,10 @@ terraform apply → reads SAME remote state → applies only changes
 | 34010330422 | Azure | ❌ Deploy | 3m50s | RG already exists (again) |
 | 34010382467 | AWS | ✅ Idempotent | 2m12s | Second run, no changes |
 | 34010558590 | Azure | ❌ Deploy | 2m37s | RG already exists (backend fix pending) |
+| 34011587567 | Azure | ❌ Deploy | 1m40s | Backend migration in progress |
+| 34011718011 | Azure | ❌ Deploy | 2m33s | State lock from stale lease |
+| 34011952950 | Azure | ✅ **SUCCESS** | 4m23s | **First successful end-to-end deploy** |
+| 34012173400 | Azure | ✅ **IDEMPOTENT** | 3m24s | **Second run, no duplicates** |
 
 ---
 

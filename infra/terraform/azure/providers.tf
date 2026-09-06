@@ -8,14 +8,13 @@ terraform {
     }
   }
 
-  # Local state for lab environment
-  # For production, use remote backend:
-  # backend "azurerm" {
-  #   resource_group_name  = "terraform-state"
-  #   storage_account_name = "tfstatepki"
-  #   container_name       = "tfstate"
-  #   key                  = "azure.terraform.tfstate"
-  # }
+  backend "azurerm" {
+    resource_group_name  = "tfstate-rg"
+    storage_account_name = "tfstate828daceb"
+    container_name       = "tfstate"
+    key                  = "azure.terraform.tfstate"
+    use_oidc             = true
+  }
 }
 
 provider "azurerm" {

@@ -101,7 +101,8 @@ resource "azurerm_public_ip" "main" {
   name                = "${local.name_prefix}-ip"
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
-  allocation_method   = "Dynamic"
+  allocation_method   = "Static"
+  sku                 = "Standard"
   tags                = local.common_tags
 }
 

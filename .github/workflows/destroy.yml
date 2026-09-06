@@ -238,8 +238,12 @@ jobs:
             
             # Verify tags
             TAGS=$(aws ec2 describe-vpcs --vpc-ids "$VPC_ID" --query "Vpcs[0].Tags" -o json 2>/dev/null || echo "[]")
-            MANAGED_BY=$(echo "$TAGS" | jq -r '.[] | select(.Key=="managed_by") | .Value // "unknown"')
-            PROJECT=$(echo "$TAGS" | jq -r '.[] | select(.Key=="project") | .Value // "unknown"')
+            MANAGED_BY=$(echo "$TAGS" | jq -r '.[] | select(.Key=="managed_by") | .Value' 2>/dev/null || echo "unknown")
+            PROJECT=$(echo "$TAGS" | jq -r '.[] | select(.Key=="project") | .Value' 2>/dev/null || echo "unknown")
+            
+            # Handle empty results
+            if [ -z "$MANAGED_BY" ]; then MANAGED_BY="unknown"; fi
+            if [ -z "$PROJECT" ]; then PROJECT="unknown"; fi
             
             echo "  managed_by: $MANAGED_BY"
             echo "  project: $PROJECT"

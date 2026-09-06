@@ -76,7 +76,8 @@ resource "aws_route_table_association" "main" {
 
 # Security Group
 resource "aws_security_group" "main" {
-  name_prefix = "${local.name_prefix}-sg"
+  name        = "${local.name_prefix}-sg"
+  description = "Security group for ${local.name_prefix}"
   vpc_id      = aws_vpc.main.id
 
   # SSH

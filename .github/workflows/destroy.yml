@@ -97,10 +97,10 @@ jobs:
           echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
 
   # ──────────────────────────────────────────────
-  # Pre-Destroy: Backup State
+  # Pre-Destroy: Verify Ownership & Backup State
   # ──────────────────────────────────────────────
-  backup-state:
-    name: "💾 Backup State"
+  pre-destroy:
+    name: "🔍 Pre-Destroy Checks"
     runs-on: ubuntu-latest
     needs: [approval]
     env:
@@ -133,12 +133,104 @@ jobs:
         working-directory: ${{ env.TF_DIR }}
         run: terraform init -input=false
 
-      - name: Select Workspace
+      - name: Verify Workspace Exists
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          WORKSPACE="${{ inputs.customer_name }}-${{ inputs.environment }}"
+          if ! terraform workspace list | grep -q "^[* ] ${WORKSPACE}$"; then
+            echo "::error::Workspace '$WORKSPACE' does not exist!"
+            echo "::error::Available workspaces:"
+            terraform workspace list
+            exit 1
+          fi
+          echo "✅ Workspace '$WORKSPACE' exists"
+          terraform workspace select "$WORKSPACE"
+
+      - name: Verify State Has Resources
         working-directory: ${{ env.TF_DIR }}
         run: |
           WORKSPACE="${{ inputs.customer_name }}-${{ inputs.environment }}"
           terraform workspace select "$WORKSPACE"
-          echo "Selected workspace: $WORKSPACE"
+          
+          RESOURCE_COUNT=$(terraform state list 2>/dev/null | wc -l)
+          if [ "$RESOURCE_COUNT" -eq 0 ]; then
+            echo "::warning::No resources found in Terraform state for workspace '$WORKSPACE'"
+            echo "This may indicate:"
+            echo "  1. Resources were already destroyed"
+            echo "  2. State file is corrupted or out of sync"
+            echo "  3. Wrong workspace selected"
+            echo ""
+            echo "Proceeding with destroy to clean up any orphaned resources..."
+          else
+            echo "✅ Found $RESOURCE_COUNT resources in state:"
+            terraform state list
+          fi
+
+      - name: Verify Resource Ownership (Azure)
+        if: inputs.cloud_provider == 'azure'
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          echo "Verifying Azure resource ownership..."
+          
+          # Get resource group name from state or construct it
+          RG_NAME=$(terraform state list 2>/dev/null | grep azurerm_resource_group | head -1 | cut -d. -f2 || echo "")
+          
+          if [ -n "$RG_NAME" ]; then
+            RG_FULL_NAME=$(terraform state show "azurerm_resource_group.$RG_NAME" 2>/dev/null | grep " name " | head -1 | awk '{print $3}' | tr -d '"' || echo "")
+            
+            if [ -n "$RG_FULL_NAME" ]; then
+              echo "Checking resource group: $RG_FULL_NAME"
+              
+              # Verify tags
+              TAGS=$(az group show --name "$RG_FULL_NAME" --query "tags" -o json 2>/dev/null || echo "{}")
+              MANAGED_BY=$(echo "$TAGS" | jq -r '.managed_by // "unknown"')
+              PROJECT=$(echo "$TAGS" | jq -r '.project // "unknown"')
+              
+              echo "  managed_by: $MANAGED_BY"
+              echo "  project: $PROJECT"
+              
+              if [ "$MANAGED_BY" != "terraform" ]; then
+                echo "::error::Resource group '$RG_FULL_NAME' is not managed by Terraform (managed_by=$MANAGED_BY)"
+                echo "::error::Refusing to destroy resources without ownership evidence"
+                exit 1
+              fi
+              
+              echo "✅ Ownership verified: Resource group is managed by Terraform"
+            fi
+          else
+            echo "::warning::No resource group found in state, skipping ownership verification"
+          fi
+
+      - name: Verify Resource Ownership (AWS)
+        if: inputs.cloud_provider == 'aws'
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          echo "Verifying AWS resource ownership..."
+          
+          # Get VPC ID from state
+          VPC_ID=$(terraform state show aws_vpc.main 2>/dev/null | grep " id " | head -1 | awk '{print $3}' | tr -d '"' || echo "")
+          
+          if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "null" ]; then
+            echo "Checking VPC: $VPC_ID"
+            
+            # Verify tags
+            TAGS=$(aws ec2 describe-vpcs --vpc-ids "$VPC_ID" --query "Vpcs[0].Tags" -o json 2>/dev/null || echo "[]")
+            MANAGED_BY=$(echo "$TAGS" | jq -r '.[] | select(.Key=="managed_by") | .Value // "unknown"')
+            PROJECT=$(echo "$TAGS" | jq -r '.[] | select(.Key=="project") | .Value // "unknown"')
+            
+            echo "  managed_by: $MANAGED_BY"
+            echo "  project: $PROJECT"
+            
+            if [ "$MANAGED_BY" != "terraform" ]; then
+              echo "::error::VPC '$VPC_ID' is not managed by Terraform (managed_by=$MANAGED_BY)"
+              echo "::error::Refusing to destroy resources without ownership evidence"
+              exit 1
+            fi
+            
+            echo "✅ Ownership verified: VPC is managed by Terraform"
+          else
+            echo "::warning::No VPC found in state, skipping ownership verification"
+          fi
 
       - name: Backup State and Outputs
         working-directory: ${{ env.TF_DIR }}
@@ -174,7 +266,7 @@ jobs:
   destroy:
     name: "💥 Destroy (${{ inputs.cloud_provider }} / ${{ inputs.customer_name }})"
     runs-on: ubuntu-latest
-    needs: [backup-state]
+    needs: [pre-destroy]
     env:
       TF_DIR: infra/terraform/${{ inputs.cloud_provider }}
     steps:
@@ -245,13 +337,135 @@ jobs:
           if-no-files-found: ignore
 
   # ──────────────────────────────────────────────
+  # Post-Destroy: Verify Zero Resources
+  # ──────────────────────────────────────────────
+  post-destroy-verify:
+    name: "✅ Post-Destroy Verification"
+    runs-on: ubuntu-latest
+    needs: [destroy]
+    if: needs.destroy.result == 'success'
+    env:
+      TF_DIR: infra/terraform/${{ inputs.cloud_provider }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Azure Login
+        if: inputs.cloud_provider == 'azure'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: AWS Credentials
+        if: inputs.cloud_provider == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform init -input=false
+
+      - name: Verify Terraform State Empty
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          WORKSPACE="${{ inputs.customer_name }}-${{ inputs.environment }}"
+          terraform workspace select "$WORKSPACE" 2>/dev/null || true
+          
+          REMAINING=$(terraform state list 2>/dev/null | wc -l)
+          if [ "$REMAINING" -gt 0 ]; then
+            echo "::error::Terraform state still contains $REMAINING resources after destroy:"
+            terraform state list
+            exit 1
+          fi
+          echo "✅ Terraform state is empty"
+
+      - name: Verify Azure Resources Destroyed
+        if: inputs.cloud_provider == 'azure'
+        run: |
+          echo "Verifying Azure resources are destroyed..."
+          
+          # Check for resource groups with pki-lab pattern
+          RG_COUNT=$(az group list --query "[?contains(name, '${{ inputs.customer_name }}') && contains(name, '${{ inputs.environment }}')]" -o json | jq length)
+          
+          if [ "$RG_COUNT" -gt 0 ]; then
+            echo "::error::Found $RG_COUNT resource groups still existing:"
+            az group list --query "[?contains(name, '${{ inputs.customer_name }}') && contains(name, '${{ inputs.environment }}')]" -o table
+            exit 1
+          fi
+          
+          # Check for soft-deleted Key Vaults
+          echo "Checking for soft-deleted Key Vaults..."
+          SOFT_DELETED_KVS=$(az keyvault list-deleted --query "[?contains(name, '${{ inputs.customer_name }}')]" -o json | jq length)
+          
+          if [ "$SOFT_DELETED_KVS" -gt 0 ]; then
+            echo "::warning::Found $SOFT_DELETED_KVS soft-deleted Key Vaults that may need purging:"
+            az keyvault list-deleted --query "[?contains(name, '${{ inputs.customer_name }}')]" -o table
+            echo "::warning::Run 'az keyvault purge --name <name>' to permanently delete them"
+          fi
+          
+          echo "✅ Azure verification complete: $RG_COUNT resource groups remaining"
+
+      - name: Verify AWS Resources Destroyed
+        if: inputs.cloud_provider == 'aws'
+        run: |
+          echo "Verifying AWS resources are destroyed..."
+          
+          # Check for EC2 instances
+          INSTANCE_COUNT=$(aws ec2 describe-instances --filters "Name=tag:project,Values=${{ inputs.customer_name }}" "Name=tag:environment,Values=${{ inputs.environment }}" "Name=instance-state-name,Values=running,pending,stopping,stopped" --query "Reservations[*].Instances[*].InstanceId" --output json | jq 'flatten | length')
+          
+          if [ "$INSTANCE_COUNT" -gt 0 ]; then
+            echo "::error::Found $INSTANCE_COUNT EC2 instances still running:"
+            aws ec2 describe-instances --filters "Name=tag:project,Values=${{ inputs.customer_name }}" "Name=tag:environment,Values=${{ inputs.environment }}" --query "Reservations[*].Instances[*].[InstanceId,State.Name,Tags[?Key=='Name'].Value|[0]]" --output table
+            exit 1
+          fi
+          
+          # Check for VPCs
+          VPC_COUNT=$(aws ec2 describe-vpcs --filters "Name=tag:project,Values=${{ inputs.customer_name }}" "Name=tag:environment,Values=${{ inputs.environment }}" --query "Vpcs[*].VpcId" --output json | jq length)
+          
+          if [ "$VPC_COUNT" -gt 0 ]; then
+            echo "::error::Found $VPC_COUNT VPCs still existing:"
+            aws ec2 describe-vpcs --filters "Name=tag:project,Values=${{ inputs.customer_name }}" "Name=tag:environment,Values=${{ inputs.environment }}" --query "Vpcs[*].[VpcId,Tags[?Key=='Name'].Value|[0]]" --output table
+            exit 1
+          fi
+          
+          # Check for IAM roles
+          ROLE_COUNT=$(aws iam list-roles --query "Roles[?contains(RoleName, '${{ inputs.customer_name }}') && contains(RoleName, '${{ inputs.environment }}')]" --output json | jq length)
+          
+          if [ "$ROLE_COUNT" -gt 0 ]; then
+            echo "::warning::Found $ROLE_COUNT IAM roles still existing:"
+            aws iam list-roles --query "Roles[?contains(RoleName, '${{ inputs.customer_name }}') && contains(RoleName, '${{ inputs.environment }}')].[RoleName,Arn]" --output table
+          fi
+          
+          echo "✅ AWS verification complete: $INSTANCE_COUNT instances, $VPC_COUNT VPCs, $ROLE_COUNT IAM roles remaining"
+
+      - name: Generate Verification Report
+        run: |
+          echo "## Post-Destroy Verification Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Terraform State Empty | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cloud Resources Destroyed | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Verification completed at:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+
+  # ──────────────────────────────────────────────
   # Post-Destroy: Cleanup Workspace
   # ──────────────────────────────────────────────
   cleanup:
     name: "🧹 Cleanup"
     runs-on: ubuntu-latest
-    needs: [destroy]
-    if: needs.destroy.result == 'success'
+    needs: [post-destroy-verify]
+    if: needs.post-destroy-verify.result == 'success'
     env:
       TF_DIR: infra/terraform/${{ inputs.cloud_provider }}
     steps:
@@ -295,13 +509,25 @@ jobs:
 
           echo "Workspace cleanup complete"
 
+      - name: Verify Workspace Deleted
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          WORKSPACE="${{ inputs.customer_name }}-${{ inputs.environment }}"
+          
+          if terraform workspace list | grep -q "^[* ] ${WORKSPACE}$"; then
+            echo "::error::Workspace '$WORKSPACE' still exists after deletion attempt"
+            exit 1
+          fi
+          
+          echo "✅ Workspace '$WORKSPACE' successfully deleted"
+
   # ──────────────────────────────────────────────
   # Final Summary
   # ──────────────────────────────────────────────
   destroy-summary:
     name: "📋 Destruction Summary"
     runs-on: ubuntu-latest
-    needs: [confirm, approval, backup-state, destroy, cleanup]
+    needs: [confirm, approval, pre-destroy, destroy, post-destroy-verify, cleanup]
     if: always()
     steps:
       - name: Generate Summary
@@ -322,13 +548,17 @@ jobs:
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Confirmation | ${{ needs.confirm.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Approval | ${{ needs.approval.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| State Backup | ${{ needs.backup-state.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Pre-Destroy Checks | ${{ needs.pre-destroy.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Destroy | ${{ needs.destroy.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Post-Destroy Verification | ${{ needs.post-destroy-verify.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Cleanup | ${{ needs.cleanup.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ "${{ needs.destroy.result }}" = "success" ]; then
-            echo "**Result:** 💥 Environment **${{ inputs.customer_name }}-${{ inputs.environment }}** has been destroyed." >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.destroy.result }}" = "success" ] && [ "${{ needs.post-destroy-verify.result }}" = "success" ]; then
+            echo "**Result:** 💥 Environment **${{ inputs.customer_name }}-${{ inputs.environment }}** has been destroyed and verified." >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.destroy.result }}" = "success" ]; then
+            echo "**Result:** ⚠️ Environment destroyed but verification failed. Manual cleanup may be required." >> $GITHUB_STEP_SUMMARY
+            exit 1
           else
             echo "**Result:** ❌ Destruction failed. Review logs for details." >> $GITHUB_STEP_SUMMARY
             exit 1

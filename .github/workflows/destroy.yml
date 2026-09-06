@@ -236,12 +236,9 @@ jobs:
           if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "null" ]; then
             echo "Checking VPC: $VPC_ID"
             
-            # Verify tags
-            TAGS_JSON=$(aws ec2 describe-vpcs --vpc-ids "$VPC_ID" --query "Vpcs[0].Tags" --output json 2>/dev/null || echo "[]")
-            
-            # Extract tags using grep and cut for better compatibility
-            MANAGED_BY=$(echo "$TAGS_JSON" | grep -o '"Key": "managed_by"[^}]*' | grep -o '"Value": "[^"]*"' | cut -d'"' -f4 || echo "unknown")
-            PROJECT=$(echo "$TAGS_JSON" | grep -o '"Key": "project"[^}]*' | grep -o '"Value": "[^"]*"' | cut -d'"' -f4 || echo "unknown")
+            # Verify tags using AWS CLI query directly
+            MANAGED_BY=$(aws ec2 describe-vpcs --vpc-ids "$VPC_ID" --query "Vpcs[0].Tags[?Key=='managed_by'].Value" --output text 2>/dev/null || echo "unknown")
+            PROJECT=$(aws ec2 describe-vpcs --vpc-ids "$VPC_ID" --query "Vpcs[0].Tags[?Key=='project'].Value" --output text 2>/dev/null || echo "unknown")
             
             # Handle empty results
             if [ -z "$MANAGED_BY" ]; then MANAGED_BY="unknown"; fi

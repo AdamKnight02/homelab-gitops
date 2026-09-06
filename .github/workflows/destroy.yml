@@ -35,6 +35,10 @@ on:
 env:
   TF_VERSION: '1.9.8'
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   # ──────────────────────────────────────────────
   # Confirmation Gate

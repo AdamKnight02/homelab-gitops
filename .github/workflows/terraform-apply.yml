@@ -55,6 +55,10 @@ on:
 env:
   TF_VERSION: '1.9.8'
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   # ──────────────────────────────────────────────
   # Approval Gate (for non-dev environments)

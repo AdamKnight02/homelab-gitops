@@ -328,10 +328,33 @@ jobs:
         working-directory: ${{ env.TF_DIR }}
         run: |
           WORKSPACE="${{ inputs.customer_name }}-${{ inputs.environment }}"
-          if [ "${{ env.WORKSPACE }}" = "default" ]; then
-            WORKSPACE="default"
+          
+          # Check if the customer workspace exists
+          if terraform workspace list | grep -q "^[* ] ${WORKSPACE}$"; then
+            echo "✅ Workspace '$WORKSPACE' exists"
+            terraform workspace select "$WORKSPACE"
+          elif [ "$WORKSPACE" != "default" ] && terraform workspace list | grep -q "^[* ] default$"; then
+            echo "::warning::Workspace '$WORKSPACE' does not exist, but 'default' workspace does"
+            echo "::warning::Checking if 'default' workspace contains resources for this customer/environment..."
+            terraform workspace select default
+            
+            # Check if default workspace has resources matching our tags
+            RESOURCE_COUNT=$(terraform state list 2>/dev/null | wc -l)
+            if [ "$RESOURCE_COUNT" -gt 0 ]; then
+              echo "::warning::Default workspace contains $RESOURCE_COUNT resources"
+              echo "::warning::Proceeding with destroy from default workspace"
+            else
+              echo "::error::Workspace '$WORKSPACE' does not exist and default workspace is empty!"
+              echo "::error::Available workspaces:"
+              terraform workspace list
+              exit 1
+            fi
+          else
+            echo "::error::Workspace '$WORKSPACE' does not exist!"
+            echo "::error::Available workspaces:"
+            terraform workspace list
+            exit 1
           fi
-          terraform workspace select "$WORKSPACE"
 
       - name: Terraform Destroy
         id: destroy

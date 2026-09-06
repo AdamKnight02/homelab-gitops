@@ -140,6 +140,7 @@ jobs:
             echo "Extracting connection information from Terraform outputs..."
             python3 << 'PYEOF'
           import json
+          import os
 
           with open('/tmp/tf-outputs/tf_outputs.json') as f:
               outputs = json.load(f)

@@ -11,7 +11,7 @@ on:
       instance_type:
         description: "EC2 instance type"
         required: true
-        default: "t3.micro"
+        default: "t3.small"
 
       root_volume_size:
         description: "Root volume size in GB"
@@ -61,6 +61,7 @@ jobs:
             -var="instance_type=${{ inputs.instance_type }}" \
             -var="root_volume_size=${{ inputs.root_volume_size }}" \
             -var="aws_region=${{ inputs.aws_region }}"
+            -var="key_name=homelab-access"
       - name: Terraform Apply
         run: |
           terraform apply -auto-approve \

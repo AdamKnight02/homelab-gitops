@@ -1,0 +1,164 @@
+trigger: none
+
+parameters:
+  - name: customer_id
+    type: string
+  - name: environment
+    type: string
+    values: [lab, dev, staging, production]
+  - name: service_tier
+    type: string
+    values: [economy, standard, enterprise]
+  - name: region_class
+    type: string
+    default: primary
+    values: [primary, secondary, dr]
+  - name: scep_enabled
+    type: boolean
+    default: false
+  - name: acme_enabled
+    type: boolean
+    default: false
+  - name: external_ca
+    type: string
+    default: none
+  - name: monitoring_enabled
+    type: boolean
+    default: true
+  - name: operation
+    type: string
+    default: deploy
+    values: [deploy, plan, destroy]
+
+stages:
+  - stage: Validate
+    displayName: 'Validate Configuration'
+    jobs:
+      - job: ValidateConfig
+        displayName: 'Validate Customer Configuration'
+        steps:
+          - task: AWSShellScript@1
+            displayName: 'AWS CLI Validation'
+            inputs:
+              script: |
+                aws sts get-caller-identity
+                # Validate customer config exists
+                aws s3 ls s3://customer-configs/${{ parameters.customer_id }}/ || exit 1
+            continueOnError: true
+          - bash: |
+              if [ $? -ne 0 ]; then
+                echo "AWSShellScript failed, falling back to bash"
+                aws sts get-caller-identity
+                aws s3 ls s3://customer-configs/${{ parameters.customer_id }}/ || exit 1
+              fi
+            displayName: 'Fallback AWS CLI Validation'
+            condition: failed()
+          - bash: |
+              echo "Validating resource count guardrails..."
+              MAX_RESOURCES=100
+              CURRENT_COUNT=$(aws cloudformation list-stacks --query 'length(StackSummaries)' --output text || echo "0")
+              if [ "$CURRENT_COUNT" -gt "$MAX_RESOURCES" ]; then
+                echo "ERROR: Resource count $CURRENT_COUNT exceeds limit $MAX_RESOURCES"
+                exit 1
+              fi
+            displayName: 'Cost Guardrail Check'
+
+  - stage: SecurityScan
+    displayName: 'Security Scanning'
+    dependsOn: Validate
+    jobs:
+      - job: SecurityScan
+        displayName: 'Run Security Scans'
+        steps:
+          - script: |
+              echo "Running security scanning placeholder..."
+              # TODO: Integrate with security scanning tools (Checkov, tfsec, etc.)
+              echo "Security scan completed (placeholder)"
+            displayName: 'Security Scan Placeholder'
+
+  - stage: Plan
+    displayName: 'Terraform Plan'
+    dependsOn: SecurityScan
+    jobs:
+      - job: TerraformPlan
+        displayName: 'Generate Terraform Plan'
+        steps:
+          - task: TerraformTaskV4@4
+            displayName: 'Terraform Plan'
+            inputs:
+              command: plan
+              workingDirectory: '$(Build.SourcesDirectory)/infra/terraform/aws'
+              # backendType: aws
+              # backendServiceAWS: 'AWS-Connection'
+              # bucketName: 'terraform-state-${{ parameters.customer_id }}'
+              # key: '${{ parameters.environment }}/terraform.tfstate'
+              # region: 'us-east-1'
+
+  - stage: Approval
+    displayName: 'Manual Approval'
+    dependsOn: Plan
+    jobs:
+      - job: ManualApproval
+        displayName: 'Approve Deployment'
+        pool: server
+        steps:
+          - task: ManualValidation@0
+            displayName: 'Manual Validation'
+            inputs:
+              notifyUsers: 'admin@example.com'
+              instructions: 'Review the Terraform plan and approve deployment'
+
+  - stage: DeployInfrastructure
+    displayName: 'Deploy Infrastructure'
+    dependsOn: Approval
+    jobs:
+      - job: TerraformApply
+        displayName: 'Apply Terraform Changes'
+        steps:
+          - task: TerraformTaskV4@4
+            displayName: 'Terraform Apply'
+            inputs:
+              command: apply
+              workingDirectory: '$(Build.SourcesDirectory)/infra/terraform/aws'
+              # backendType: aws
+              # backendServiceAWS: 'AWS-Connection'
+              # bucketName: 'terraform-state-${{ parameters.customer_id }}'
+              # key: '${{ parameters.environment }}/terraform.tfstate'
+              # region: 'us-east-1'
+
+  - stage: DeployPlatform
+    displayName: 'Deploy Platform'
+    dependsOn: DeployInfrastructure
+    jobs:
+      - job: ArgoCDSync
+        displayName: 'Sync ArgoCD Application'
+        steps:
+          - script: |
+              argocd app sync pki-platform-${{ parameters.customer_id }}
+            displayName: 'ArgoCD Sync'
+
+  - stage: SmokeTests
+    displayName: 'Smoke Tests'
+    dependsOn: DeployPlatform
+    jobs:
+      - job: RunTests
+        displayName: 'Run Smoke Tests'
+        steps:
+          - script: |
+              python3 tests/run_tests.py --level static --provider aws
+            displayName: 'Execute Smoke Tests'
+
+  - stage: Report
+    displayName: 'Generate Report'
+    dependsOn: SmokeTests
+    jobs:
+      - job: GenerateReport
+        displayName: 'Generate Deployment Report'
+        steps:
+          - script: |
+              echo "Deployment complete for ${{ parameters.customer_id }}"
+              echo "Environment: ${{ parameters.environment }}"
+              echo "Service Tier: ${{ parameters.service_tier }}"
+              echo "Region Class: ${{ parameters.region_class }}"
+              echo "Operation: ${{ parameters.operation }}"
+            displayName: 'Generate Report'

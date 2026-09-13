@@ -1,0 +1,48 @@
+# Blackbox exporter Application — endpoint probing (OCSP/CRL/ACME/SCEP).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-blackbox
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    app.kubernetes.io/name: blackbox-exporter
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  project: default
+
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: prometheus-blackbox-exporter
+      targetRevision: 8.17.0
+      helm:
+        releaseName: blackbox-exporter
+        valueFiles:
+          - $values/gitops/monitoring/base/blackbox-exporter/values.yaml
+
+    - repoURL: https://github.com/AdamKnight02/homelab-gitops.git
+      targetRevision: main
+      ref: values
+
+    # Probe CRs (Kustomize-free raw manifest; probes.yaml is plain YAML)
+    - repoURL: https://github.com/AdamKnight02/homelab-gitops.git
+      targetRevision: main
+      path: gitops/monitoring/base/blackbox-exporter
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

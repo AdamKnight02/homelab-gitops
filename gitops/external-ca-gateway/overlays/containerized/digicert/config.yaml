@@ -1,0 +1,53 @@
+# Containerized overlay — DigiCert CertCentral example.
+# Other providers (entrust/, globalsign/, smallstep/) follow this shape.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: external-ca-gateway-config
+  namespace: pki
+data:
+  provider: digicert
+  endpoint: https://www.digicert.com/services/v2
+  # Non-secret config only. API keys live in the ExternalSecret below.
+---
+# Credentials via External Secrets (OpenBao backend) — never committed.
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: external-ca-gateway-credentials
+  namespace: pki
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao-pki
+    kind: ClusterSecretStore
+  target:
+    name: external-ca-gateway-credentials
+  data:
+    - secretKey: DIGICERT_API_KEY
+      remoteRef:
+        key: pki/external-ca/digicert
+        property: api-key
+---
+# Reachability probe — feeds the External CA Integrations dashboard.
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: external-ca-digicert
+  namespace: monitoring
+  labels:
+    monitoring.pki.platform.io/enabled: "true"
+    component: external-ca
+spec:
+  jobName: external-ca-digicert
+  interval: 60s
+  module: https_cert
+  prober:
+    url: blackbox-exporter.monitoring.svc:9115
+    scheme: http
+  targets:
+    staticConfig:
+      static:
+        - https://www.digicert.com/services/v2/user
+      labels:
+        ca_provider: digicert

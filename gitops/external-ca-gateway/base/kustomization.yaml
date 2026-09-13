@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: pki
+
+resources:
+  - deployment.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: machine-identity-platform
+  app.kubernetes.io/managed-by: argocd
+
+images:
+  - name: registry/external-ca-gateway
+    newTag: latest

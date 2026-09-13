@@ -1,0 +1,13 @@
+---
+# Homelab Storage Class Patch
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: pki-database
+  namespace: pki
+spec:
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      storageClassName: local-path

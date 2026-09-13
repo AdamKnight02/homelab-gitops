@@ -1,0 +1,32 @@
+---
+# Base Kustomization - Cloud-Neutral PKI Platform
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: pki
+
+resources:
+  - namespace.yaml
+  - pki-database.yaml
+  - cert-api.yaml
+  - cert-worker.yaml
+  - ca-service.yaml
+  - networkpolicy-default-deny.yaml
+
+# Common labels applied to all resources
+commonLabels:
+  app.kubernetes.io/part-of: machine-identity-platform
+  app.kubernetes.io/managed-by: argocd
+  project: pki-cloudlab
+  environment: lab
+  managed_by: terraform
+  ephemeral: "true"
+
+# Images to be overridden per environment
+images:
+  - name: registry/cert-api
+    newTag: latest
+  - name: registry/cert-worker
+    newTag: latest
+  - name: registry/ca-service
+    newTag: latest

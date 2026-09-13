@@ -1,0 +1,48 @@
+# ECONOMY tier — minimal footprint, short retention.
+# Target: dev/small customers, homelab, single-node clusters.
+# - 3d retention, 5Gi TSDB
+# - single replica everything, no HA
+# - no remote write
+# - reduced scrape frequency to save CPU
+prometheus:
+  prometheusSpec:
+    retention: 3d
+    retentionSize: 4GiB
+    scrapeInterval: 60s
+    evaluationInterval: 60s
+    replicas: 1
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+alertmanager:
+  alertmanagerSpec:
+    replicas: 1
+
+grafana:
+  persistence:
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+# Drop the noisiest default rules to reduce alert volume on small installs.
+defaultRules:
+  rules:
+    kubernetesResources: false
+    node: true

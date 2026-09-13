@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "aws",
+  "ownerHandle": "ivangdavila",
+  "installedVersion": "1.0.7",
+  "installedAt": 1788406322001,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "62462533778d6a9c90cf4cb07ff96c92dd581b7b9e074362a227a16681db35ad",
+    "integrity": "sha256-YkYlM3eNapyQz0ywf/lskt1YG3ueB0NioiehZoHbNa0="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "9730c9540e0d50ff0292f872ec2b2fa81a950c7075b27d9ae2e62cf423f9bb63"
+  }
+}

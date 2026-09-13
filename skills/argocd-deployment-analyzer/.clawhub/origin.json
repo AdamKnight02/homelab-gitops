@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "argocd-deployment-analyzer",
+  "installedVersion": "1.0.1",
+  "installedAt": 1788402808166,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "5db6cfda659575839db8a6d31c5456bdaabe4284fea2db83e9fd6e709b86bf92",
+    "integrity": "sha256-XbbP2mWVdYOduKbTHFRWvaq+QoT+otuD6f1ucJuGv5I="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "d1c171813b7be85d3d69516704db3514381ae4327a630d5af89d48afd8e3161f"
+  }
+}

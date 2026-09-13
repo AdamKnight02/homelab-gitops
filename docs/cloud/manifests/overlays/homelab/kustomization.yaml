@@ -1,0 +1,31 @@
+---
+# Homelab Overlay - Local Environment
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: pki
+
+resources:
+  - ../../base
+
+# Homelab-specific patches
+patches:
+  - path: storage-class-patch.yaml
+  - path: image-registry-patch.yaml
+
+# Homelab-specific labels
+commonLabels:
+  environment: homelab
+  trust-domain: homelab.local
+
+# Homelab-specific images
+images:
+  - name: registry/cert-api
+    newName: 10.42.0.88:5000/cert-api
+    newTag: latest
+  - name: registry/cert-worker
+    newName: 10.42.0.88:5000/cert-worker
+    newTag: latest
+  - name: registry/ca-service
+    newName: 10.42.0.88:5000/ca-service
+    newTag: latest

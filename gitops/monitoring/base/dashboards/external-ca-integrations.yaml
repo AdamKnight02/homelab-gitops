@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dash-external-ca-integrations
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: PKI Platform
+data:
+  external-ca-integrations.json: |
+    {
+      "uid": "pki-external-ca",
+      "title": "External CA Integrations",
+      "tags": ["pki", "external-ca", "gateway"],
+      "timezone": "browser",
+      "refresh": "1m",
+      "time": {"from": "now-24h", "to": "now"},
+      "panels": [
+        {
+          "id": 1, "type": "stat", "title": "Gateways Reachable",
+          "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+          "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}},
+          "targets": [{"expr": "sum(probe_success{job=~\"external-ca-.*\"})"}]
+        },
+        {
+          "id": 2, "type": "stat", "title": "Gateway TLS Cert Min Days Left",
+          "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
+          "fieldConfig": {"defaults": {"unit": "d", "thresholds": {"steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 30}, {"color": "green", "value": 60}]}}},
+          "targets": [{"expr": "min((probe_ssl_earliest_cert_expiry{job=~\"external-ca-.*\"} - time()) / 86400)"}]
+        },
+        {
+          "id": 3, "type": "stat", "title": "External Issuance (24h)",
+          "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0},
+          "targets": [{"expr": "sum(increase(pki_external_ca_issuance_total[24h]))"}]
+        },
+        {
+          "id": 4, "type": "stat", "title": "External Issuance Errors (24h)",
+          "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0},
+          "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 10}]}}},
+          "targets": [{"expr": "sum(increase(pki_external_ca_issuance_total{result=\"error\"}[24h]))"}]
+        },
+        {
+          "id": 5, "type": "timeseries", "title": "Gateway Probe Latency",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+          "fieldConfig": {"defaults": {"unit": "s"}},
+          "targets": [{"expr": "probe_duration_seconds{job=~\"external-ca-.*\"}", "legendFormat": "{{ instance }}"}]
+        },
+        {
+          "id": 6, "type": "timeseries", "title": "Issuance by External CA",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+          "fieldConfig": {"defaults": {"custom": {"stacking": {"mode": "normal"}}}},
+          "targets": [{"expr": "sum(rate(pki_external_ca_issuance_total[1h])) by (ca_provider, result)", "legendFormat": "{{ ca_provider }} {{ result }}"}]
+        },
+        {
+          "id": 7, "type": "table", "title": "Gateway Endpoint Status",
+          "gridPos": {"h": 9, "w": 24, "x": 0, "y": 14},
+          "targets": [
+            {"expr": "probe_success{job=~\"external-ca-.*\"}", "format": "table", "instant": true},
+            {"expr": "(probe_ssl_earliest_cert_expiry{job=~\"external-ca-.*\"} - time()) / 86400", "format": "table", "instant": true}
+          ]
+        }
+      ],
+      "schemaVersion": 39,
+      "version": 1
+    }

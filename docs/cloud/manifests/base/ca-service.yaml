@@ -1,0 +1,151 @@
+---
+# ca-service Deployment - Cloud-Neutral Base
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ca-service
+  namespace: pki
+  labels:
+    app: ca-service
+    app.kubernetes.io/name: ca-service
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ca-service
+  template:
+    metadata:
+      labels:
+        app: ca-service
+        app.kubernetes.io/name: ca-service
+        app.kubernetes.io/part-of: machine-identity-platform
+        spiffe.io/spire-managed-identity: "true"
+    spec:
+      serviceAccountName: ca-service
+      containers:
+      - name: service
+        image: registry/ca-service:latest  # Overridden per environment
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        env:
+        - name: EJBCA_URL
+          value: "https://ejbca.ejbca.svc"
+        - name: EJBCA_CREDENTIALS_PATH
+          value: "/secrets/ejbca-credentials.p12"
+        - name: OPENBAO_ADDR
+          value: "https://openbao.openbao.svc:8200"
+        - name: SPIFFE_SOCKET_PATH
+          value: "/spiffe-socket/agent.sock"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: SUPPORTED_PROTOCOLS
+          value: "est,acme,cmp,rest"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        volumeMounts:
+        - name: spiffe-socket
+          mountPath: /spiffe-socket
+          readOnly: true
+        - name: ejbca-credentials
+          mountPath: /secrets
+          readOnly: true
+      volumes:
+      - name: spiffe-socket
+        csi:
+          driver: "csi.spiffe.io"
+          readOnly: true
+      - name: ejbca-credentials
+        secret:
+          secretName: ejbca-api-credentials
+---
+# ca-service Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: ca-service
+  namespace: pki
+  labels:
+    app: ca-service
+spec:
+  type: ClusterIP
+  selector:
+    app: ca-service
+  ports:
+  - port: 8000
+    targetPort: 8000
+    name: http
+---
+# ca-service ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ca-service
+  namespace: pki
+  labels:
+    app.kubernetes.io/name: ca-service
+    app.kubernetes.io/part-of: machine-identity-platform
+    spiffe.io/spire-managed-identity: "true"
+automountServiceAccountToken: true
+---
+# ca-service NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ca-service
+  namespace: pki
+spec:
+  podSelector:
+    matchLabels:
+      app: ca-service
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: pki
+    ports:
+    - protocol: TCP
+      port: 8000
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ejbca
+    ports:
+    - protocol: TCP
+      port: 443
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openbao
+    ports:
+    - protocol: TCP
+      port: 8200
+  - to:  # DNS
+    - namespaceSelector: {}
+    ports:
+    - protocol: UDP
+      port: 53

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "docker-essentials-1-0-0",
+  "installedVersion": "1.0.0",
+  "installedAt": 1788400312931,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "7b712366db3bdae198f988d7662bdc688cb3c4b71f2dec88ac33d6dd87b6a3ee",
+    "integrity": "sha256-e3EjZts72uGY+YjXZivcaIyzxLcfLeyIrDPW3Ye2o+4="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "bf8120febd5275b0b1d5f996a4cbed4f52b7d99895271604f87f02b58e7d96a9"
+  }
+}

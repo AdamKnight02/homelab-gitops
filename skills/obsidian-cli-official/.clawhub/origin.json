@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "obsidian-cli-official",
+  "installedVersion": "4.0.2",
+  "installedAt": 1788399945507,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "08438b33b42368f9f5a4e7f65f7ee6cfd468b97663567a0c772804bbb2e19b8f",
+    "integrity": "sha256-CEOLM7QjaPn1pOf2X37mz9RouXZjVnoMdygEu7Lhm48="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "da1fbba1aaf3ad7852705d272cd0f31ea160a3baebef27468b7ff904213f8e27"
+  }
+}

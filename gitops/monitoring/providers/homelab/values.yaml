@@ -1,0 +1,37 @@
+# HOMELAB provider overlay — k3s on local VM.
+# - local-path storage class (k3s default)
+# - node-exporter enabled (we own the nodes)
+# - NodePort services for Grafana/Prometheus (no cloud LB)
+prometheus:
+  prometheusSpec:
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+  service:
+    type: NodePort
+    nodePort: 30090
+
+alertmanager:
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+  service:
+    type: NodePort
+    nodePort: 30093
+
+grafana:
+  persistence:
+    storageClassName: local-path
+  service:
+    type: NodePort
+    nodePort: 30030
+
+prometheus-node-exporter:
+  enabled: true

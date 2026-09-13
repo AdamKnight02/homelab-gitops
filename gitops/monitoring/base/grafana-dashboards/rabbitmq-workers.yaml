@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dash-rabbitmq-workers
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: PKI Platform
+data:
+  rabbitmq-workers.json: |
+    {
+      "uid": "pki-rabbitmq-workers",
+      "title": "RabbitMQ / Worker Processing",
+      "tags": ["pki", "rabbitmq", "workers"],
+      "timezone": "browser",
+      "refresh": "15s",
+      "time": {"from": "now-3h", "to": "now"},
+      "panels": [
+        {
+          "id": 1, "type": "stat", "title": "RabbitMQ Up",
+          "gridPos": {"h": 5, "w": 4, "x": 0, "y": 0},
+          "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}]}},
+          "targets": [{"expr": "max(rabbitmq_up)"}]
+        },
+        {
+          "id": 2, "type": "stat", "title": "Total Queued",
+          "gridPos": {"h": 5, "w": 4, "x": 4, "y": 0},
+          "targets": [{"expr": "sum(rabbitmq_queue_messages_ready{queue=~\"cert-.*\"})"}]
+        },
+        {
+          "id": 3, "type": "stat", "title": "Unacked",
+          "gridPos": {"h": 5, "w": 4, "x": 8, "y": 0},
+          "targets": [{"expr": "sum(rabbitmq_queue_messages_unacked{queue=~\"cert-.*\"})"}]
+        },
+        {
+          "id": 4, "type": "stat", "title": "Consumers",
+          "gridPos": {"h": 5, "w": 4, "x": 12, "y": 0},
+          "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}},
+          "targets": [{"expr": "sum(rabbitmq_queue_consumers{queue=~\"cert-.*\"})"}]
+        },
+        {
+          "id": 5, "type": "stat", "title": "Worker Replicas Ready",
+          "gridPos": {"h": 5, "w": 4, "x": 16, "y": 0},
+          "targets": [{"expr": "sum(kube_deployment_status_replicas_available{namespace=\"pki\", deployment=~\"cert-worker.*\"})"}]
+        },
+        {
+          "id": 6, "type": "stat", "title": "Processing Errors (1h)",
+          "gridPos": {"h": 5, "w": 4, "x": 20, "y": 0},
+          "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 5}, {"color": "red", "value": 25}]}}},
+          "targets": [{"expr": "sum(increase(pki_worker_jobs_failed_total[1h]))"}]
+        },
+        {
+          "id": 7, "type": "timeseries", "title": "Queue Depth by Queue",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
+          "targets": [{"expr": "rabbitmq_queue_messages_ready{queue=~\"cert-.*\"}", "legendFormat": "{{ queue }}"}]
+        },
+        {
+          "id": 8, "type": "timeseries", "title": "Publish / Deliver / Ack Rates",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
+          "fieldConfig": {"defaults": {"unit": "ops"}},
+          "targets": [
+            {"expr": "sum(rate(rabbitmq_queue_messages_published_total{queue=~\"cert-.*\"}[5m]))", "legendFormat": "published"},
+            {"expr": "sum(rate(rabbitmq_queue_messages_delivered_total{queue=~\"cert-.*\"}[5m]))", "legendFormat": "delivered"},
+            {"expr": "sum(rate(rabbitmq_queue_messages_acked_total{queue=~\"cert-.*\"}[5m]))", "legendFormat": "acked"}
+          ]
+        },
+        {
+          "id": 9, "type": "timeseries", "title": "Worker Job Duration p95",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
+          "fieldConfig": {"defaults": {"unit": "s"}},
+          "targets": [{"expr": "histogram_quantile(0.95, sum(rate(pki_worker_job_duration_seconds_bucket[5m])) by (le, job_type))", "legendFormat": "{{ job_type }}"}]
+        },
+        {
+          "id": 10, "type": "timeseries", "title": "Jobs by Result",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
+          "fieldConfig": {"defaults": {"custom": {"stacking": {"mode": "normal"}}}},
+          "targets": [{"expr": "sum(rate(pki_worker_jobs_total[5m])) by (result)", "legendFormat": "{{ result }}"}]
+        }
+      ],
+      "schemaVersion": 39,
+      "version": 1
+    }

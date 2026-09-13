@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "microsoft-playwright-cli",
+  "installedVersion": "0.1.9",
+  "installedAt": 1788400290682,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "d538c11a5d94d81ed3a1edf06131768310d50c4f51881fe7cae25bb77dd169e0",
+    "integrity": "sha256-1TjBGl2U2B7Toe3wYTF2gxDVDE9RiB/nyuJbt33RaeA="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "77dd6b7ce1e1ef694beb0fad664c807a9ebc311d9c119b5c65f8b523a6db6b01"
+  }
+}

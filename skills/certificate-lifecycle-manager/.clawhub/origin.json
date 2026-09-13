@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "certificate-lifecycle-manager",
+  "installedVersion": "1.0.1",
+  "installedAt": 1788402848624,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "72ab7a8debc1d5d9c54227ccf17a08d2a9c4f98631fea7f3858ee6fe5fdaa16f",
+    "integrity": "sha256-cqt6jevB1dnFQifM8XoI0qnE+YYx/qfzhY7m/l/aoW8="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "d4351ca1294fc374cfbe3d8089d30ed4fecc9edbc2c1d8bef3c5f545075ada92"
+  }
+}

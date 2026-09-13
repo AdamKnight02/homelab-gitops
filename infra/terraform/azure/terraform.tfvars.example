@@ -1,0 +1,57 @@
+# =============================================================================
+# Azure Terraform Variables — Example File
+# =============================================================================
+# Copy this file to terraform.tfvars and customize values.
+# NEVER commit terraform.tfvars (it is gitignored).
+# =============================================================================
+
+# --- Service Tier (PRIMARY DRIVER) ---
+# Determines all infrastructure topology. See docs/azure/tiers.md.
+# service_tier = "economy"    # Single VM, K3s, minimal cost (~$33/mo)
+# service_tier = "standard"   # 3 VMs, Azure DB, LB (~$200/mo)
+# service_tier = "enterprise" # 6 VMs, HA DB, Key Vault, monitoring (~$1000/mo)
+
+# --- Azure Authentication ---
+# azure_subscription_id = "00000000-0000-0000-0000-000000000000"
+# azure_tenant_id       = "00000000-0000-0000-0000-000000000000"
+
+# --- Region ---
+# azure_region = "eastus"
+
+# --- Resource Naming ---
+# name_prefix = "pki"
+# resource_group_name = "pki-cloudlab-rg"
+
+# --- Compute ---
+# azure_vm_size = "Standard_B2s"        # Economy default
+# azure_vm_size_override = ""            # Override tier-driven VM size
+# azure_os_disk_size_gb = 30
+
+# --- Networking ---
+# network_cidr = "10.0.0.0/16"
+# subnet_cidr  = "10.0.1.0/24"
+
+# --- SSH Access ---
+# WARNING: Only enable SSH from known IPs. Empty = no inbound SSH.
+# allow_ssh_cidr = ["203.0.113.0/24"]
+
+# --- Public IP ---
+# WARNING: Public IPs incur cost and increase attack surface.
+# azure_public_ip_enabled = false
+
+# --- K3s / Argo CD ---
+# k3s_version         = "v1.30"
+# argocd_version      = "v2.12"
+# git_repo_url        = "https://github.com/AdamKnight02/homelab-gitops.git"
+# git_target_revision = "main"
+
+# --- Tier-Specific Options ---
+# enable_aks = false              # Enterprise only: use AKS instead of K3s
+# enable_app_gateway = false      # Enterprise only: use App Gateway instead of LB
+# enable_azure_csi = false        # Install Azure Disk/File CSI drivers
+# enable_azure_ccm = false        # Install Azure Cloud Controller Manager
+# alert_email = ""                # Email for Azure Monitor alerts
+# k3s_token = ""                  # K3s cluster token (auto-generated if empty)
+
+# --- PKI ---
+# trust_domain = "cloudlab.local"

@@ -1,0 +1,13 @@
+---
+# PKI Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pki
+  labels:
+    name: pki
+    app.kubernetes.io/part-of: machine-identity-platform
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

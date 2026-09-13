@@ -1,0 +1,24 @@
+# AWS overlay — IRSA for state-api.
+# Requires: IAM role with s3:GetObject/HeadObject/ListBucketVersions on the
+# state bucket, dynamodb:GetItem on the lock table, s3:PutObject on backups/*
+# only, trust policy for the EKS OIDC provider + this SA.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: state-system
+
+resources:
+  - ../../base
+
+patches:
+  - patch: |
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: state-api
+        namespace: state-system
+        annotations:
+          eks.amazonaws.com/role-arn: "${AWS_STATE_API_ROLE_ARN}"
+    target:
+      kind: ServiceAccount
+      name: state-api

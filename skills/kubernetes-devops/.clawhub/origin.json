@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "kubernetes-devops",
+  "installedVersion": "1.0.0",
+  "installedAt": 1788402832412,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "57d444ce1053842260f9486cf6a0b352a13a1375db0676da02fd1e54dcf9f5bf",
+    "integrity": "sha256-V9REzhBThCJg+Uhs9qCzUqE6E3XbBnbaAv0eVNz59b8="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "27fbae60282140f1e24a27f71a7e1071cd901f563c9e29e019b51804d7193a3a"
+  }
+}

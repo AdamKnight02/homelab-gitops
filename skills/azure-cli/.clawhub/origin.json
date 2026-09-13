@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "azure-cli",
+  "ownerHandle": "ddevaal",
+  "installedVersion": "1.0.0",
+  "installedAt": 1788403430445,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "c24e958c5e656fb1ebafd079cde4f784e947dd9520aee2ad534881c4a64eec66",
+    "integrity": "sha256-wk6VjF5lb7Hrr9B5zeT3hOlH3ZUgruKtU0iBxKZO7GY="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "ee338e1a26663172537c83367fa0e8e39fc5f428a49eb2208d4957400c714199"
+  }
+}

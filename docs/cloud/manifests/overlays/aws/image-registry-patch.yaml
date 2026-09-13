@@ -1,0 +1,37 @@
+---
+# AWS Image Registry Patch (ECR placeholder)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cert-api
+  namespace: pki
+spec:
+  template:
+    spec:
+      containers:
+      - name: api
+        image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/cert-api:latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cert-worker
+  namespace: pki
+spec:
+  template:
+    spec:
+      containers:
+      - name: worker
+        image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/cert-worker:latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ca-service
+  namespace: pki
+spec:
+  template:
+    spec:
+      containers:
+      - name: service
+        image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/ca-service:latest

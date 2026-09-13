@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "cc-godmode-5-11-3",
+  "installedVersion": "1.0.0",
+  "installedAt": 1788400330582,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "e1939150de673257919dc5148089d3e14bbfadfe5fd1efa3763f173a548b5772",
+    "integrity": "sha256-4ZORUN5nMleRncUUgInT4Uu/rf5f0e+jdj8XOlSLV3I="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "e30fe2394de3b8f18a5bf9c53629df2826adb8ecd77314c4eefa952480d6a350"
+  }
+}

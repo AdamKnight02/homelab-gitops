@@ -1,0 +1,40 @@
+# Platform extras Application — ServiceMonitors, alert rules, dashboards.
+# These are pure Kustomize trees rendered from Git (no Helm).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-extras
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    app.kubernetes.io/name: monitoring-extras
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/AdamKnight02/homelab-gitops.git
+    targetRevision: main
+    path: gitops/monitoring/base
+    directory:
+      recurse: true
+      include: '*/kustomization.yaml'
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

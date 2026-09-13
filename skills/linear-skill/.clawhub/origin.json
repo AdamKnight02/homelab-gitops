@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "linear-skill",
+  "installedVersion": "1.0.0",
+  "installedAt": 1788399924260,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "7c5821616037ec2149ef2e91f6196866ee3f7713aa85a43e7e5835cc5ab50b83",
+    "integrity": "sha256-fFghYWA37CFJ7y6R9hloZu4/dxOqhaQ+flg1zFq1C4M="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "e7d1bdda23d41a65933c63cdb1bb94b44462ce8676a15674b776c9cce2b8eb23"
+  }
+}

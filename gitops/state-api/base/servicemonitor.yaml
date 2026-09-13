@@ -1,0 +1,32 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: state-api
+  namespace: state-system
+  labels:
+    app.kubernetes.io/name: state-api
+    monitoring.pki.platform.io/enabled: "true"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: state-api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      # Metrics endpoint requires auth; prometheus uses bearer token from secret
+      bearerTokenSecret:
+        name: state-api-metrics-token
+        key: token
+---
+# Token for Prometheus to scrape /metrics (audience: state-api).
+# Created via: kubectl create token state-api-metrics -n state-system --audience=state-api
+# or via a ServiceAccount + TokenRequest in CI. Placeholder SA here; the secret
+# is provisioned out-of-band (never committed).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: state-api-metrics
+  namespace: state-system
+  labels:
+    app.kubernetes.io/name: state-api

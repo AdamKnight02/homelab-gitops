@@ -1,0 +1,48 @@
+# STANDARD tier — production default.
+# Target: paying customers, moderate scale.
+# - 15d retention, 50Gi TSDB
+# - single Prometheus replica (HA optional), 2x Alertmanager
+# - faster scrape on hot paths
+prometheus:
+  prometheusSpec:
+    retention: 15d
+    retentionSize: 45GiB
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    replicas: 1
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+    resources:
+      requests:
+        cpu: 250m
+        memory: 1Gi
+      limits:
+        cpu: "2"
+        memory: 4Gi
+
+alertmanager:
+  alertmanagerSpec:
+    replicas: 2
+    storage:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 2Gi
+
+grafana:
+  persistence:
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

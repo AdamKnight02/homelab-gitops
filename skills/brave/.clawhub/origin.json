@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "brave",
+  "installedVersion": "1.0.0",
+  "installedAt": 1788400404701,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "dd40dabd95cfe10aedfb6127c9c2dcb003ba64a5fcdf5ea0cd46a20ae3ac98b1",
+    "integrity": "sha256-3UDavZXP4Qrt+2EnycLcsAO6ZKX8316gzUaiCuOsmLE="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "5a38483e8a8885f8fa2243f3526ea222bf6101692859d4d42a399b1d28ea82c3"
+  }
+}

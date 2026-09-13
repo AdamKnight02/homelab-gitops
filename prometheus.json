@@ -1,0 +1,11 @@
+{
+  "instances": [
+    {
+      "name": "homelab",
+      "url": "http://192.168.122.74:9090",
+      "user": "",
+      "password": ""
+    }
+  ],
+  "default": "homelab"
+}

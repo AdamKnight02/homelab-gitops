@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "grafana-monitoring",
+  "installedVersion": "1.0.6",
+  "installedAt": 1788402778967,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "fe53a63c9d5d2b50353ea44aed2e50bbbbd147c87799c5ce6bba99f6ec2d0448",
+    "integrity": "sha256-/lOmPJ1dK1A1PqRK7S5Qu7vRR8h3mcXOa7qZ9uwtBEg="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "177769961896e43382dcca99bcc77e66b690ad9c471f50bd6f6a4ceec95c1ae1"
+  }
+}

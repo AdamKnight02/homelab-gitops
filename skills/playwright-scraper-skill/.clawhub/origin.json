@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "playwright-scraper-skill",
+  "installedVersion": "1.2.0",
+  "installedAt": 1788399851020,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "8ad6aaef945eb22b1e9fd4c6729075b5b85b6115387e96bdae637f83f4939070",
+    "integrity": "sha256-itaq75Resisen9TGcpB1tbhbYRU4fpa9rmN/g/STkHA="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "c2f4ec84a3a054712dbf9e192be22250d87bffff8906ddbdacea7a3c8b3cfb26"
+  }
+}

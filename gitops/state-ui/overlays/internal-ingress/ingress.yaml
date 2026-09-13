@@ -1,0 +1,41 @@
+# INTERNAL ingress for state-ui. Requirements:
+#   - ingressClassName: internal (private LB / internal NGINX only)
+#   - SSO proxy in front (oauth2-proxy) injecting X-Forwarded-Access-Token
+#   - TLS terminated at the internal ingress
+# This resource is only rendered when the internal-ingress overlay is enabled.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: state-ui
+  namespace: state-system
+  labels:
+    app.kubernetes.io/name: state-ui
+  annotations:
+    # Internal-only class — never the public ingress controller
+    kubernetes.io/ingress.class: internal
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # SSO gate (oauth2-proxy pattern)
+    nginx.ingress.kubernetes.io/auth-url: "https://oauth2.internal.pki.platform.io/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://oauth2.internal.pki.platform.io/oauth2/start?rd=$escaped_request_uri"
+    nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-Request-Access-Token,X-Auth-Request-User,X-Auth-Request-Groups"
+    # Hardening
+    nginx.ingress.kubernetes.io/limit-rps: "20"
+    nginx.ingress.kubernetes.io/proxy-body-size: 1m
+spec:
+  ingressClassName: internal
+  rules:
+    - host: state.internal.pki.platform.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: state-ui
+                port:
+                  number: 8080
+  tls:
+    - hosts:
+        - state.internal.pki.platform.io
+      secretName: state-ui-internal-tls

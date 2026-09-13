@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "playwright-mcp",
+  "installedVersion": "1.0.0",
+  "installedAt": 1788399780457,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "4f94296f4d37031ef8aae5891c21569199774a012e6bf0e779fd721696e6343c",
+    "integrity": "sha256-T5Qpb003Ax74quWJHCFWkZl3SgEua/Dnef1yFpbmNDw="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "179b2b6335aa2e3c1ba5a7796a44e648655161a40ee17cc8c5d3ac0411ea20e2"
+  }
+}

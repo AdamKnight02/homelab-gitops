@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "prometheus",
+  "installedVersion": "1.1.0",
+  "installedAt": 1788402779797,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "fda9f1d04e7b7155c02f5fe8a0c2658771b35f112cf72c76574368810467e92a",
+    "integrity": "sha256-/anx0E57cVXAL1/ooMJlh3GzXxEs9yx2V0NogQRn6So="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "6a3d205d5e6ecf13bf8f0de3334f1699c7236dc6edf586a02214ad9c07d72d74"
+  }
+}

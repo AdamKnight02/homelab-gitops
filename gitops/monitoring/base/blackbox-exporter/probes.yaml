@@ -1,0 +1,100 @@
+# Blackbox Probe CRs — endpoint health for PKI services.
+# Targets are per-environment; the base ships homelab defaults and overlays
+# patch the target list. Customer overlays add their own Probe CRs in
+# customer namespaces.
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: pki-ocsp-responder
+  namespace: monitoring
+  labels:
+    monitoring.pki.platform.io/enabled: "true"
+    app.kubernetes.io/part-of: machine-identity-platform
+    component: ocsp
+spec:
+  jobName: ocsp-probe
+  interval: 30s
+  scrapeTimeout: 10s
+  module: ocsp_http
+  prober:
+    url: blackbox-exporter.monitoring.svc:9115
+    scheme: http
+  targets:
+    staticConfig:
+      static:
+        # EJBCA OCSP responder (homelab default; overlay patches per env)
+        - http://ejbca-ejbca-ce.ejbca.svc:8080/ejbca/publicweb/status/ocsp
+      labels:
+        service: ocsp
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: pki-crl-distribution
+  namespace: monitoring
+  labels:
+    monitoring.pki.platform.io/enabled: "true"
+    app.kubernetes.io/part-of: machine-identity-platform
+    component: crl
+spec:
+  jobName: crl-probe
+  interval: 60s
+  scrapeTimeout: 15s
+  module: crl_http
+  prober:
+    url: blackbox-exporter.monitoring.svc:9115
+    scheme: http
+  targets:
+    staticConfig:
+      static:
+        - http://ejbca-ejbca-ce.ejbca.svc:8080/ejbca/publicweb/webdist/certdist?cmd=crl&issuer=CN%3DManagementCA
+      labels:
+        service: crl
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: pki-acme-directory
+  namespace: monitoring
+  labels:
+    monitoring.pki.platform.io/enabled: "true"
+    app.kubernetes.io/part-of: machine-identity-platform
+    component: acme
+spec:
+  jobName: acme-probe
+  interval: 60s
+  scrapeTimeout: 10s
+  module: acme_directory
+  prober:
+    url: blackbox-exporter.monitoring.svc:9115
+    scheme: http
+  targets:
+    staticConfig:
+      static:
+        - http://ejbca-ejbca-ce.ejbca.svc:8080/ejbca/acme/directory
+      labels:
+        service: acme
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: pki-scep-endpoint
+  namespace: monitoring
+  labels:
+    monitoring.pki.platform.io/enabled: "true"
+    app.kubernetes.io/part-of: machine-identity-platform
+    component: scep
+spec:
+  jobName: scep-probe
+  interval: 60s
+  scrapeTimeout: 10s
+  module: scep_operation
+  prober:
+    url: blackbox-exporter.monitoring.svc:9115
+    scheme: http
+  targets:
+    staticConfig:
+      static:
+        - http://ejbca-ejbca-ce.ejbca.svc:8080/ejbca/publicweb/apply/scep/pkiclient.exe?operation=GetCACaps
+      labels:
+        service: scep

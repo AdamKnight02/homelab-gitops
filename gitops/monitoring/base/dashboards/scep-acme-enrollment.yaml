@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dash-scep-acme-enrollment
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: PKI Platform
+data:
+  scep-acme-enrollment.json: |
+    {
+      "uid": "pki-enrollment",
+      "title": "SCEP / ACME Enrollment",
+      "tags": ["pki", "scep", "acme", "enrollment"],
+      "timezone": "browser",
+      "refresh": "30s",
+      "time": {"from": "now-24h", "to": "now"},
+      "panels": [
+        {
+          "id": 1, "type": "stat", "title": "ACME Probe",
+          "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+          "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "FAIL", "color": "red"}, "1": {"text": "OK", "color": "green"}}}]}},
+          "targets": [{"expr": "min(probe_success{service=\"acme\"})"}]
+        },
+        {
+          "id": 2, "type": "stat", "title": "SCEP Probe",
+          "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+          "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "FAIL", "color": "red"}, "1": {"text": "OK", "color": "green"}}}]}},
+          "targets": [{"expr": "min(probe_success{service=\"scep\"})"}]
+        },
+        {
+          "id": 3, "type": "stat", "title": "ACME Success Rate (1h)",
+          "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0},
+          "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 0.9}, {"color": "green", "value": 0.98}]}}},
+          "targets": [{"expr": "sum(rate(pki_enrollment_requests_total{protocol=\"acme\", result=\"success\"}[1h])) / clamp_min(sum(rate(pki_enrollment_requests_total{protocol=\"acme\"}[1h])), 1)"}]
+        },
+        {
+          "id": 4, "type": "stat", "title": "SCEP Success Rate (1h)",
+          "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0},
+          "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 0.9}, {"color": "green", "value": 0.98}]}}},
+          "targets": [{"expr": "sum(rate(pki_enrollment_requests_total{protocol=\"scep\", result=\"success\"}[1h])) / clamp_min(sum(rate(pki_enrollment_requests_total{protocol=\"scep\"}[1h])), 1)"}]
+        },
+        {
+          "id": 5, "type": "timeseries", "title": "Enrollment Requests by Protocol & Result",
+          "gridPos": {"h": 9, "w": 12, "x": 0, "y": 5},
+          "fieldConfig": {"defaults": {"unit": "ops", "custom": {"stacking": {"mode": "normal"}}}},
+          "targets": [{"expr": "sum(rate(pki_enrollment_requests_total[5m])) by (protocol, result)", "legendFormat": "{{ protocol }} {{ result }}"}]
+        },
+        {
+          "id": 6, "type": "timeseries", "title": "Enrollment Latency p95 by Protocol",
+          "gridPos": {"h": 9, "w": 12, "x": 12, "y": 5},
+          "fieldConfig": {"defaults": {"unit": "s"}},
+          "targets": [{"expr": "histogram_quantile(0.95, sum(rate(pki_enrollment_duration_seconds_bucket[5m])) by (le, protocol))", "legendFormat": "{{ protocol }} p95"}]
+        },
+        {
+          "id": 7, "type": "piechart", "title": "Enrollments by Customer (24h)",
+          "gridPos": {"h": 9, "w": 12, "x": 0, "y": 14},
+          "targets": [{"expr": "sum(increase(pki_enrollment_requests_total[24h])) by (customer)", "legendFormat": "{{ customer }}"}]
+        },
+        {
+          "id": 8, "type": "timeseries", "title": "ACME Challenge Types",
+          "gridPos": {"h": 9, "w": 12, "x": 12, "y": 14},
+          "targets": [{"expr": "sum(rate(pki_acme_challenges_total[5m])) by (challenge_type, result)", "legendFormat": "{{ challenge_type }} {{ result }}"}]
+        }
+      ],
+      "schemaVersion": 39,
+      "version": 1
+    }

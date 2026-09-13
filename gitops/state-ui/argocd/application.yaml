@@ -1,0 +1,42 @@
+# Argo CD Application for state-ui.
+# Default: base only (ClusterIP, no ingress). To expose internally, switch
+# path to gitops/state-ui/overlays/internal-ingress after configuring the
+# internal ingress class + SSO proxy hostnames.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: state-ui
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    app.kubernetes.io/name: state-ui
+    app.kubernetes.io/part-of: pki-platform
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/AdamKnight02/homelab-gitops.git
+    targetRevision: main
+    path: gitops/state-ui/base
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: state-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  revisionHistoryLimit: 5

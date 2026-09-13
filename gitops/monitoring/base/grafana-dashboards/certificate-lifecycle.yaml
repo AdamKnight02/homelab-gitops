@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dash-certificate-lifecycle
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: PKI Platform
+data:
+  certificate-lifecycle.json: |
+    {
+      "uid": "pki-cert-lifecycle",
+      "title": "Certificate Lifecycle",
+      "tags": ["pki", "certificates", "cert-manager"],
+      "timezone": "browser",
+      "refresh": "1m",
+      "time": {"from": "now-7d", "to": "now"},
+      "panels": [
+        {
+          "id": 1, "type": "stat", "title": "cert-manager Certificates Ready",
+          "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+          "targets": [{"expr": "sum(certmanager_certificate_ready_condition{condition=\"True\"})"}]
+        },
+        {
+          "id": 2, "type": "stat", "title": "Not Ready",
+          "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
+          "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}},
+          "targets": [{"expr": "sum(certmanager_certificate_ready_condition{condition=\"False\"})"}]
+        },
+        {
+          "id": 3, "type": "stat", "title": "Expiring < 7d",
+          "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0},
+          "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 5}]}}},
+          "targets": [{"expr": "count((certmanager_certificate_expiration_timestamp_seconds - time()) < 7*24*3600)"}]
+        },
+        {
+          "id": 4, "type": "stat", "title": "ACME Orders (7d)",
+          "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0},
+          "targets": [{"expr": "sum(increase(certmanager_http_acme_client_request_count[7d]))"}]
+        },
+        {
+          "id": 5, "type": "timeseries", "title": "Days Until Expiry (min over fleet)",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+          "fieldConfig": {"defaults": {"unit": "d", "thresholds": {"steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 14}, {"color": "green", "value": 30}]}}},
+          "targets": [{"expr": "min((certmanager_certificate_expiration_timestamp_seconds - time()) / 86400) by (namespace)", "legendFormat": "{{ namespace }}"}]
+        },
+        {
+          "id": 6, "type": "timeseries", "title": "Issuance / Renewal Events",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+          "targets": [
+            {"expr": "sum(increase(pki_certificates_issued_total[1h])) by (ca_name)", "legendFormat": "issued {{ ca_name }}"},
+            {"expr": "sum(increase(pki_certificates_renewed_total[1h])) by (ca_name)", "legendFormat": "renewed {{ ca_name }}"},
+            {"expr": "sum(increase(pki_certificates_revoked_total[1h])) by (ca_name)", "legendFormat": "revoked {{ ca_name }}"}
+          ]
+        },
+        {
+          "id": 7, "type": "table", "title": "Certificates by Expiry (ascending)",
+          "gridPos": {"h": 10, "w": 24, "x": 0, "y": 14},
+          "targets": [{"expr": "sort(certmanager_certificate_expiration_timestamp_seconds - time())", "format": "table", "instant": true}]
+        }
+      ],
+      "schemaVersion": 39,
+      "version": 1
+    }

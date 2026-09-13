@@ -1,0 +1,241 @@
+# kube-prometheus-stack base values.
+# These values are environment-neutral. Tier overlays (economy/standard/enterprise)
+# and provider overlays (homelab/azure/aws) patch retention, storage, and HA.
+#
+# Rendered through Argo CD multi-source Application:
+#   chart: prometheus-community/kube-prometheus-stack
+#   valueFiles: $values/gitops/monitoring/base/prometheus-stack/values.yaml
+#             + $values/gitops/monitoring/overlays/<tier>/values.yaml
+#             + $values/gitops/monitoring/providers/<provider>/values.yaml
+
+fullnameOverride: monitoring
+
+# ---------------------------------------------------------------------------
+# Prometheus Operator
+# ---------------------------------------------------------------------------
+prometheusOperator:
+  enabled: true
+  # Watch ALL namespaces so customer namespaces can register their own
+  # ServiceMonitor/PodMonitor objects. Customer isolation is enforced by
+  # label selection (see serviceMonitorSelector) + network policy, not by
+  # namespace scoping — this lets platform SREs see everything while
+  # customers only see their own Grafana org.
+  namespaces: {}
+  serviceMonitorSelectorNilUsesHelmValues: false
+  podMonitorSelectorNilUsesHelmValues: false
+  ruleSelectorNilUsesHelmValues: false
+  probeSelectorNilUsesHelmValues: false
+
+# ---------------------------------------------------------------------------
+# Prometheus
+# ---------------------------------------------------------------------------
+prometheus:
+  enabled: true
+  prometheusSpec:
+    # Select monitors that carry the platform monitoring label. Customer
+    # namespaces opt in by labeling their monitors:
+    #   monitoring.pki.platform.io/enabled: "true"
+    #   monitoring.pki.platform.io/customer: <customer-id>
+    serviceMonitorSelector:
+      matchLabels:
+        monitoring.pki.platform.io/enabled: "true"
+    podMonitorSelector:
+      matchLabels:
+        monitoring.pki.platform.io/enabled: "true"
+    ruleSelector:
+      matchLabels:
+        monitoring.pki.platform.io/enabled: "true"
+    probeSelector:
+      matchLabels:
+        monitoring.pki.platform.io/enabled: "true"
+
+    # External labels identify this platform instance in federated /
+    # long-term-storage setups (Thanos/Mimir remote write in enterprise tier).
+    externalLabels:
+      platform: machine-identity-platform
+      environment: lab
+
+    # Retention is overridden per tier:
+    #   economy:    3d  / 5Gi
+    #   standard:   15d / 50Gi
+    #   enterprise: 30d local + remote write / 200Gi
+    retention: 3d
+    retentionSize: 4GiB
+
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 2Gi
+
+    # Scrape tuning for PKI workloads — OCSP/CRL endpoints are latency
+    # sensitive; keep default interval moderate and let hot paths override.
+    scrapeInterval: 30s
+    scrapeTimeout: 10s
+    evaluationInterval: 30s
+
+    # WAL compression — meaningful on small homelab nodes.
+    walCompression: true
+
+  # Thanos sidecar is enabled only in the enterprise overlay.
+  thanosService:
+    enabled: false
+
+# ---------------------------------------------------------------------------
+# Alertmanager
+# ---------------------------------------------------------------------------
+alertmanager:
+  enabled: true
+  config:
+    global:
+      resolve_timeout: 5m
+      # smtp / webhook config is injected per environment via
+      # AlertmanagerConfig CRs (see base/alert-rules/) so secrets never
+      # live in this file.
+    route:
+      receiver: platform-default
+      group_by: ["alertname", "namespace", "customer"]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      routes:
+        # Customer-tagged alerts route to per-customer receivers defined
+        # by AlertmanagerConfig CRs in customer namespaces.
+        - matchers:
+            - customer != ""
+          continue: true
+          receiver: platform-default
+        # PKI severity=critical pages immediately.
+        - matchers:
+            - severity = critical
+            - component =~ "ca|ocsp|crl|hsm"
+          receiver: pki-critical
+          repeat_interval: 1h
+    receivers:
+      - name: platform-default
+      - name: pki-critical
+    inhibit_rules:
+      - source_match:
+          severity: critical
+        target_match:
+          severity: warning
+        equal: ["alertname", "namespace"]
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 1Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# ---------------------------------------------------------------------------
+# Grafana (sidecar-loaded dashboards from gitops/monitoring/base/grafana-dashboards)
+# ---------------------------------------------------------------------------
+grafana:
+  enabled: true
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      # Folder names come from the dashboards' annotations so the nine
+      # platform dashboards land in a "PKI Platform" folder.
+      folderAnnotation: grafana_folder
+      provider:
+        foldersFromFilesStructure: true
+    datasources:
+      enabled: true
+      label: grafana_datasource
+      labelValue: "1"
+  persistence:
+    enabled: true
+    size: 2Gi
+  grafana.ini:
+    auth:
+      disable_login_form: false
+    security:
+      allow_embedding: false
+    server:
+      root_url: "%(protocol)s://%(domain)s/grafana/"
+      serve_from_sub_path: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# ---------------------------------------------------------------------------
+# kube-state-metrics — REQUIRED for certificate/object inventory panels
+# ---------------------------------------------------------------------------
+kube-state-metrics:
+  enabled: true
+  # cert-manager metrics (certificate expiry, ready state) come through
+  # cert-manager's own ServiceMonitor; KSM provides deployment/statefulset/
+  # pvc/node object state.
+  extraArgs:
+    - --metric-labels-allowlist=pods=[app.kubernetes.io/name,app.kubernetes.io/part-of,monitoring.pki.platform.io/customer],namespaces=[monitoring.pki.platform.io/customer]
+
+# ---------------------------------------------------------------------------
+# node-exporter
+# ---------------------------------------------------------------------------
+prometheus-node-exporter:
+  enabled: true
+  # Disabled on providers where node metrics come from the managed
+  # control plane (AKS/EKS) — see provider overlays.
+  prometheus:
+    monitor:
+      enabled: true
+      labels:
+        monitoring.pki.platform.io/enabled: "true"
+
+# ---------------------------------------------------------------------------
+# Default rules — keep Kubernetes rules, drop noisy ones in overlays.
+# ---------------------------------------------------------------------------
+defaultRules:
+  create: true
+  rules:
+    alertmanager: true
+    etcd: false            # no etcd access on managed providers
+    kubernetesApps: true
+    kubernetesResources: true
+    kubernetesStorage: true
+    kubernetesSystem: true
+    node: true
+    prometheus: true
+    prometheusOperator: true
+  # Our PKI rules live in gitops/monitoring/base/alert-rules/ so they are
+  # versioned as first-class PrometheusRule CRs, not chart values.
+
+# ---------------------------------------------------------------------------
+# Network policy — deny-all base, explicit allows in platform namespaces.
+# ---------------------------------------------------------------------------
+networkPolicy:
+  enabled: true
+
+# Clean up stale CRDs on upgrade.
+crds:
+  enabled: true

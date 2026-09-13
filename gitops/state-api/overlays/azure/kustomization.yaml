@@ -1,0 +1,40 @@
+# Azure overlay — Workload Identity for state-api.
+# Requires: federated credential on the user-assigned managed identity with
+# Storage Blob Data Reader (status/versions) + Storage Blob Data Contributor
+# (backup writes) on the tfstate container ONLY.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: state-system
+
+resources:
+  - ../../base
+
+patches:
+  - patch: |
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: state-api
+        namespace: state-system
+        annotations:
+          azure.workload.identity/client-id: "${AZURE_STATE_API_CLIENT_ID}"
+        labels:
+          azure.workload.identity/use: "true"
+    target:
+      kind: ServiceAccount
+      name: state-api
+  - patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: state-api
+        namespace: state-system
+      spec:
+        template:
+          metadata:
+            labels:
+              azure.workload.identity/use: "true"
+    target:
+      kind: Deployment
+      name: state-api

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "queue-aiops",
+  "installedVersion": "0.8.0",
+  "installedAt": 1788402828829,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "c7b4b9efc74e2c8b542bdbf99fddd7c9d88e03d0ed29ae2cb34502f579a2cfae",
+    "integrity": "sha256-x7S578dOLItUK9v5n93XydiOA9DtKa4ss0UC9Xmiz64="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "f0f52031a62e383419c6b49599eb9f002694e3e79ae4f25572876801754e29e2"
+  }
+}

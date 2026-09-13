@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "monday-direct",
+  "installedVersion": "1.0.7",
+  "installedAt": 1788399850706,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "419d228cf5279ccd84a5833f7d82fbe727ae640d21b4bb8d380d473c62a85659",
+    "integrity": "sha256-QZ0ijPUnnM2EpYM/fYL75yeuZA0htLuNOA1HPGKoVlk="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "1f58e8cab0b5739ed843e99ceb5aa60864566890347eb828856a8b17068ddc1f"
+  }
+}

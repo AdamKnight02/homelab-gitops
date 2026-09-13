@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "proactive-agent-2",
+  "installedVersion": "0.1.0",
+  "installedAt": 1788400450997,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "7ad8393a57e4e2f0e46d89c858279831ef7fdc230adc999d2ab1daf0e7e6cae4",
+    "integrity": "sha256-etg5Olfk4vDkbYnIWCeYMe9/3CMK3JmdKrHa8OfmyuQ="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "5a61dae55820c670d23de61500aa48956b7a1b20c3f01cdc7e596b51fd854c03"
+  }
+}

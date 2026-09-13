@@ -1,0 +1,43 @@
+# AZURE provider overlay — AKS.
+# - managed-csi (Azure Disk) storage, zone-redundant where supported
+# - node-exporter disabled: AKS managed node metrics via Azure Monitor /
+#   container insights; keep enabled here only if self-managing nodes.
+# - LoadBalancer services with internal annotation for private access
+prometheus:
+  prometheusSpec:
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: managed-csi-premium
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+  service:
+    type: ClusterIP
+
+alertmanager:
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: managed-csi-premium
+
+grafana:
+  persistence:
+    storageClassName: managed-csi-premium
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+  # Azure AD / Entra ID OAuth — client secret via ExternalSecret per customer.
+  grafana.ini:
+    auth.azuread:
+      enabled: true
+      allow_sign_up: false
+      scopes: openid email profile
+    # client_id / client_secret injected via env from secret:
+    #   GF_AUTH_AZUREAD_CLIENT_ID / GF_AUTH_AZUREAD_CLIENT_SECRET
+
+prometheus-node-exporter:
+  enabled: false

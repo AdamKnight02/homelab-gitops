@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "terraform",
+  "ownerHandle": "ivangdavila",
+  "installedVersion": "1.0.4",
+  "installedAt": 1788406590276,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "4ec8bad040c11a3a39b3d93bc8d34ae7243bb8de49ba9c2b0c3092e5d9d8ac12",
+    "integrity": "sha256-Tsi60EDBGjo5s9k7yNNK5yQ7uN5JupwrDDCS5dnYrBI="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "9d58f88d634515f9dd9ecdfa3a30b475f3e5cf764ae72b8635d1cbed4fc0962b"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "agentsmail",
+  "installedVersion": "0.4.6",
+  "installedAt": 1788400532276,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "f595d0418bd9035fca8f635f4c8512fe3ba85bdac16d3fa436f41d31aba6cf8f",
+    "integrity": "sha256-9ZXQQYvZA1/Kj2NfTIUS/juoW9rBbT+kNvQdMaumz48="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "73e34aae39abc5de2406178e4063b2ff1e210abf8f450359fee16009ae4b1316"
+  }
+}

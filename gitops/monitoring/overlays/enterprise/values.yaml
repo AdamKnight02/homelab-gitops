@@ -1,0 +1,70 @@
+# ENTERPRISE tier — HA + long retention.
+# Target: regulated/large customers with compliance retention requirements.
+# - 30d local retention + remote write to long-term storage (Thanos/Mimir)
+# - 2x Prometheus replicas (deduped at the remote store)
+# - 3x Alertmanager cluster
+# - 200Gi TSDB, anti-affinity across nodes
+prometheus:
+  prometheusSpec:
+    retention: 30d
+    retentionSize: 180GiB
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+    replicas: 2
+    replicaExternalLabelName: prometheus_replica
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 200Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 4Gi
+      limits:
+        cpu: "4"
+        memory: 8Gi
+    podAntiAffinity: hard
+    podAntiAffinityTopologyKey: kubernetes.io/hostname
+
+    # Remote write endpoint is injected per provider/customer via
+    # additionalRemoteWrite in the customer overlay (secrets via
+    # remoteWriteSpec basic auth Secret refs).
+    # Example:
+    # remoteWrite:
+    #   - url: https://mimir.gateway.example/api/v1/push
+    #     basicAuth:
+    #       username: {name: remote-write-auth, key: user}
+    #       password: {name: remote-write-auth, key: pass}
+
+  thanosService:
+    enabled: true
+  thanosServiceMonitor:
+    enabled: true
+
+alertmanager:
+  alertmanagerSpec:
+    replicas: 3
+    podAntiAffinity: hard
+    podAntiAffinityTopologyKey: kubernetes.io/hostname
+    storage:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+
+grafana:
+  persistence:
+    size: 10Gi
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi

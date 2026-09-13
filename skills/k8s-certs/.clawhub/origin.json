@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "k8s-certs",
+  "installedVersion": "1.0.0",
+  "installedAt": 1788402806629,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "fff171e26377d8b6d68b975463d23c0f0a3a60522bcc93a0859fe5b0f0e5a6ff",
+    "integrity": "sha256-//Fx4mN32LbWi5dUY9I8Dwo6YFIrzJOghZ/lsPDlpv8="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "8a83ae50a1073469ba2539b7a65799779fc894d18e21fd5078df6be995320acf"
+  }
+}

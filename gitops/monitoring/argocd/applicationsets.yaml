@@ -1,0 +1,102 @@
+# ApplicationSet — one monitoring stack per (tier × provider) combination.
+#
+# Use this when running multiple environments from one Git repo. Disable the
+# static application.yaml when enabling this set to avoid duplicate apps.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: monitoring-matrix
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  goTemplate: true
+  generators:
+    - matrix:
+        generators:
+          - list:
+              elements:
+                - tier: economy
+                  retention: 3d
+                - tier: standard
+                  retention: 15d
+                - tier: enterprise
+                  retention: 30d
+          - list:
+              elements:
+                - provider: homelab
+                  cluster: https://kubernetes.default.svc
+                # - provider: azure
+                #   cluster: https://aks-pki-prod.eastus.azmk8s.io:443
+                # - provider: aws
+                #   cluster: https://eks-pki-prod.us-east-1.eks.amazonaws.com
+  template:
+    metadata:
+      name: 'monitoring-{{.tier}}-{{.provider}}'
+      labels:
+        pki.platform.io/tier: '{{.tier}}'
+        pki.platform.io/provider: '{{.provider}}'
+    spec:
+      project: default
+      sources:
+        - repoURL: https://prometheus-community.github.io/helm-charts
+          chart: kube-prometheus-stack
+          targetRevision: 65.5.1
+          helm:
+            releaseName: monitoring
+            valueFiles:
+              - $values/gitops/monitoring/base/prometheus-stack/values.yaml
+              - $values/gitops/monitoring/overlays/{{.tier}}/values.yaml
+              - $values/gitops/monitoring/providers/{{.provider}}/values.yaml
+        - repoURL: https://github.com/AdamKnight02/homelab-gitops.git
+          targetRevision: main
+          ref: values
+      destination:
+        server: '{{.cluster}}'
+        namespace: monitoring
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+---
+# ApplicationSet — auto-onboards customer monitoring overlays.
+# Any directory under gitops/monitoring/customers/ (except _template)
+# becomes an Argo CD Application.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: monitoring-customers
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  goTemplate: true
+  generators:
+    - git:
+        repoURL: https://github.com/AdamKnight02/homelab-gitops.git
+        revision: main
+        directories:
+          - path: gitops/monitoring/customers/*
+          - path: gitops/monitoring/customers/_template
+            exclude: true
+  template:
+    metadata:
+      name: 'monitoring-customer-{{index .path.segments 3}}'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/AdamKnight02/homelab-gitops.git
+        targetRevision: main
+        path: '{{.path.path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: monitoring
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=false

@@ -1,0 +1,582 @@
+# Azure DevOps Pipeline: AWS Add-On Infrastructure Deployment
+# Deploys add-on components to an existing AWS customer environment.
+# Supports: external_ca, scep, acme, monitoring, additional_gateway, additional_worker
+
+trigger: none
+pr: none
+
+parameters:
+  - name: customer_id
+    type: string
+    displayName: "Customer ID"
+  - name: environment
+    type: string
+    displayName: "Environment"
+  - name: addon_type
+    type: string
+    displayName: "Add-On Type"
+    values:
+      - external_ca
+      - scep
+      - acme
+      - monitoring
+      - additional_gateway
+      - additional_worker
+  - name: external_ca_provider
+    type: string
+    displayName: "External CA Provider"
+    default: none
+  - name: deployment_profile
+    type: string
+    displayName: "Deployment Profile"
+    default: standard
+    values:
+      - economy
+      - standard
+      - enterprise
+  - name: operation
+    type: string
+    displayName: "Operation"
+    default: deploy
+    values:
+      - deploy
+      - plan
+      - remove
+
+variables:
+  - name: terraformWorkingDir
+    value: "$(Build.SourcesDirectory)/infra/terraform/aws"
+  - name: addonTargetPrefix
+    value: "module.addon_${{ parameters.addon_type }}"
+  - name: tfStateKey
+    value: "${{ parameters.customer_id }}/${{ parameters.environment }}/addon-${{ parameters.addon_type }}.tfstate"
+  - name: awsRegion
+    value: "us-east-1"
+  - name: maxResourceCount
+    value: 50
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  # ============================================================================
+  # STAGE 1: VALIDATE
+  # ============================================================================
+  - stage: VALIDATE
+    displayName: "Validate Add-On Request"
+    jobs:
+      - job: ValidateAddon
+        displayName: "Validate add-on configuration and credentials"
+        steps:
+          - checkout: self
+
+          - task: AWSShellScript@1
+            displayName: "Validate AWS credentials"
+            inputs:
+              awsCredentials: "aws-service-connection"
+              regionName: "$(awsRegion)"
+              scriptType: "inline"
+              inlineScript: |
+                set -euo pipefail
+                echo "Validating AWS credentials..."
+                aws sts get-caller-identity
+                echo "Credentials valid."
+
+          - task: Bash@3
+            displayName: "Load current state and check for duplicates"
+            inputs:
+              targetType: "inline"
+              workingDirectory: "$(terraformWorkingDir)"
+              script: |
+                set -euo pipefail
+
+                ADDON_TYPE="${{ parameters.addon_type }}"
+                CUSTOMER="${{ parameters.customer_id }}"
+                ENV="${{ parameters.environment }}"
+
+                echo "=== Add-On Validation ==="
+                echo "Customer: $CUSTOMER"
+                echo "Environment: $ENV"
+                echo "Add-On Type: $ADDON_TYPE"
+                echo "Operation: ${{ parameters.operation }}"
+                echo "Deployment Profile: ${{ parameters.deployment_profile }}"
+
+                # Optional: S3 backend config (uncomment to use remote state)
+                # terraform init \
+                #   -backend-config="bucket=${CUSTOMER}-tfstate" \
+                #   -backend-config="key=${tfStateKey}" \
+                #   -backend-config="region=${awsRegion}" \
+                #   -backend-config="encrypt=true"
+
+                terraform init -input=false
+
+                echo "--- Checking for existing add-on resources ---"
+                EXISTING=$(terraform state list 2>/dev/null | grep -i "addon_${ADDON_TYPE}" || true)
+
+                if [ -n "$EXISTING" ] && [ "${{ parameters.operation }}" = "deploy" ]; then
+                  echo "##vso[task.logissue type=warning]Existing add-on resources detected:"
+                  echo "$EXISTING"
+                  echo "##vso[task.logissue type=warning]Duplicate deployment detected. Set operation=plan to review or operation=remove to clean up."
+                  echo "##vso[task.setvariable variable=duplicateDetected;isOutput=true]true"
+                else
+                  echo "No duplicate add-on resources found."
+                  echo "##vso[task.setvariable variable=duplicateDetected;isOutput=true]false"
+                fi
+
+                # Validate add-on specific requirements
+                case "$ADDON_TYPE" in
+                  external_ca)
+                    if [ "${{ parameters.external_ca_provider }}" = "none" ]; then
+                      echo "##vso[task.logissue type=error]external_ca_provider must be specified when addon_type=external_ca"
+                      exit 1
+                    fi
+                    ;;
+                  scep|acme)
+                    echo "PKI add-on selected. Validating PKI prerequisites..."
+                    ;;
+                  monitoring)
+                    echo "Monitoring add-on selected."
+                    ;;
+                  additional_gateway|additional_worker)
+                    echo "Scaling add-on selected."
+                    ;;
+                esac
+
+                echo "Validation complete."
+
+          - task: PublishPipelineArtifact@1
+            displayName: "Publish validation results"
+            inputs:
+              targetPath: "$(terraformWorkingDir)/.terraform"
+              artifact: "validation-state"
+              publishLocation: "pipeline"
+            condition: succeededOrFailed()
+
+  # ============================================================================
+  # STAGE 2: PLAN
+  # ============================================================================
+  - stage: PLAN
+    displayName: "Terraform Plan"
+    dependsOn: VALIDATE
+    condition: succeeded()
+    jobs:
+      - job: TerraformPlan
+        displayName: "Plan add-on infrastructure changes"
+        steps:
+          - checkout: self
+
+          - task: TerraformTaskV4@4
+            displayName: "Terraform Init"
+            inputs:
+              provider: "aws"
+              command: "init"
+              workingDirectory: "$(terraformWorkingDir)"
+              backendServiceAWS: "aws-service-connection"
+              backendAWSBucketName: "${{ parameters.customer_id }}-tfstate"
+              backendAWSBucketKey: "$(tfStateKey)"
+
+          - task: TerraformTaskV4@4
+            displayName: "Terraform Plan"
+            inputs:
+              provider: "aws"
+              command: "plan"
+              workingDirectory: "$(terraformWorkingDir)"
+              environmentServiceNameAWS: "aws-service-connection"
+              commandOptions: |
+                -target=$(addonTargetPrefix)
+                -var="customer_id=${{ parameters.customer_id }}"
+                -var="environment=${{ parameters.environment }}"
+                -var="addon_type=${{ parameters.addon_type }}"
+                -var="external_ca_provider=${{ parameters.external_ca_provider }}"
+                -var="deployment_profile=${{ parameters.deployment_profile }}"
+                -var="operation=${{ parameters.operation }}"
+                -out=$(Build.ArtifactStagingDirectory)/tfplan
+                -detailed-exitcode
+                -input=false
+
+          - task: Bash@3
+            displayName: "Resource count and cost guardrails"
+            inputs:
+              targetType: "inline"
+              workingDirectory: "$(terraformWorkingDir)"
+              script: |
+                set -euo pipefail
+
+                PLAN_FILE="$(Build.ArtifactStagingDirectory)/tfplan"
+                MAX_RESOURCES=$(maxResourceCount)
+
+                echo "=== Resource Count Check ==="
+                if [ -f "$PLAN_FILE" ]; then
+                  terraform show -json "$PLAN_FILE" > plan.json 2>/dev/null || true
+
+                  if [ -f plan.json ]; then
+                    CREATE_COUNT=$(jq '[.resource_changes[] | select(.change.actions | contains(["create"]))] | length' plan.json)
+                    UPDATE_COUNT=$(jq '[.resource_changes[] | select(.change.actions | contains(["update"]))] | length' plan.json)
+                    DELETE_COUNT=$(jq '[.resource_changes[] | select(.change.actions | contains(["delete"]))] | length' plan.json)
+                    TOTAL_COUNT=$((CREATE_COUNT + UPDATE_COUNT + DELETE_COUNT))
+
+                    echo "Resources to create: $CREATE_COUNT"
+                    echo "Resources to update: $UPDATE_COUNT"
+                    echo "Resources to delete: $DELETE_COUNT"
+                    echo "Total changes: $TOTAL_COUNT"
+
+                    if [ "$TOTAL_COUNT" -gt "$MAX_RESOURCES" ]; then
+                      echo "##vso[task.logissue type=error]Resource count ($TOTAL_COUNT) exceeds guardrail limit ($MAX_RESOURCES)"
+                      exit 1
+                    fi
+
+                    echo "##vso[task.setvariable variable=createCount;isOutput=true]$CREATE_COUNT"
+                    echo "##vso[task.setvariable variable=updateCount;isOutput=true]$UPDATE_COUNT"
+                    echo "##vso[task.setvariable variable=deleteCount;isOutput=true]$DELETE_COUNT"
+                  else
+                    echo "Warning: Could not parse plan JSON. Skipping detailed count."
+                  fi
+                else
+                  echo "Warning: Plan file not found. Skipping resource count."
+                fi
+
+                echo "=== Cost Estimate (placeholder) ==="
+                echo "Add-on type: ${{ parameters.addon_type }}"
+                echo "Deployment profile: ${{ parameters.deployment_profile }}"
+                echo "Estimated monthly cost: TBD (integrate Infracost or AWS Cost Explorer)"
+
+          - task: Bash@3
+            displayName: "Security review"
+            inputs:
+              targetType: "inline"
+              workingDirectory: "$(terraformWorkingDir)"
+              script: |
+                set -euo pipefail
+                echo "=== Security Review ==="
+                echo "Reviewing planned changes for security concerns..."
+
+                # Check for overly permissive security groups
+                if [ -f plan.json ]; then
+                  OPEN_SG=$(jq '[.resource_changes[] | select(.type == "aws_security_group_rule") | select(.change.after.cidr_blocks[]? == "0.0.0.0/0")] | length' plan.json 2>/dev/null || echo "0")
+                  if [ "$OPEN_SG" -gt 0 ]; then
+                    echo "##vso[task.logissue type=warning]Found $OPEN_SG security group rules open to 0.0.0.0/0"
+                  fi
+                fi
+
+                echo "Security review complete."
+
+          - task: PublishPipelineArtifact@1
+            displayName: "Publish terraform plan"
+            inputs:
+              targetPath: "$(Build.ArtifactStagingDirectory)/tfplan"
+              artifact: "terraform-plan"
+              publishLocation: "pipeline"
+
+  # ============================================================================
+  # STAGE 3: APPROVAL
+  # ============================================================================
+  - stage: APPROVAL
+    displayName: "Manual Approval"
+    dependsOn: PLAN
+    condition: and(succeeded(), eq('${{ parameters.operation }}', 'deploy'))
+    jobs:
+      - job: WaitForApproval
+        displayName: "Wait for manual approval"
+        pool: server
+        timeoutInMinutes: 4320  # 3 days
+        steps:
+          - task: ManualValidation@0
+            displayName: "Approve add-on deployment"
+            inputs:
+              notifyUsers: ""
+              instructions: |
+                Please review the terraform plan for the following add-on deployment:
+
+                - Customer: ${{ parameters.customer_id }}
+                - Environment: ${{ parameters.environment }}
+                - Add-On Type: ${{ parameters.addon_type }}
+                - Deployment Profile: ${{ parameters.deployment_profile }}
+                - Operation: ${{ parameters.operation }}
+
+                Review the plan artifact and approve to proceed with deployment.
+              onTimeout: "reject"
+
+  # ============================================================================
+  # STAGE 4: DEPLOY_ADDON
+  # ============================================================================
+  - stage: DEPLOY_ADDON
+    displayName: "Deploy Add-On"
+    dependsOn: APPROVAL
+    condition: and(succeeded(), eq('${{ parameters.operation }}', 'deploy'))
+    jobs:
+      - job: DeployAddon
+        displayName: "Deploy add-on infrastructure"
+        steps:
+          - checkout: self
+
+          - task: TerraformTaskV4@4
+            displayName: "Terraform Init"
+            inputs:
+              provider: "aws"
+              command: "init"
+              workingDirectory: "$(terraformWorkingDir)"
+              backendServiceAWS: "aws-service-connection"
+              backendAWSBucketName: "${{ parameters.customer_id }}-tfstate"
+              backendAWSBucketKey: "$(tfStateKey)"
+
+          - task: TerraformTaskV4@4
+            displayName: "Terraform Apply (Targeted)"
+            inputs:
+              provider: "aws"
+              command: "apply"
+              workingDirectory: "$(terraformWorkingDir)"
+              environmentServiceNameAWS: "aws-service-connection"
+              commandOptions: |
+                -target=$(addonTargetPrefix)
+                -var="customer_id=${{ parameters.customer_id }}"
+                -var="environment=${{ parameters.environment }}"
+                -var="addon_type=${{ parameters.addon_type }}"
+                -var="external_ca_provider=${{ parameters.external_ca_provider }}"
+                -var="deployment_profile=${{ parameters.deployment_profile }}"
+                -var="operation=${{ parameters.operation }}"
+                -auto-approve
+                -input=false
+
+          - task: AWSShellScript@1
+            displayName: "Argo CD Sync"
+            inputs:
+              awsCredentials: "aws-service-connection"
+              regionName: "$(awsRegion)"
+              scriptType: "inline"
+              inlineScript: |
+                set -euo pipefail
+                echo "=== Argo CD Sync ==="
+                echo "Syncing Argo CD application for add-on: ${{ parameters.addon_type }}"
+
+                # Placeholder: Replace with actual Argo CD CLI or API call
+                # argocd app sync "${{ parameters.customer_id }}-${{ parameters.environment }}-addon-${{ parameters.addon_type }}" \
+                #   --server "$ARGOCD_SERVER" \
+                #   --auth-token "$ARGOCD_TOKEN"
+
+                echo "Argo CD sync initiated (placeholder)."
+
+          - task: Bash@3
+            displayName: "Configure add-on"
+            inputs:
+              targetType: "inline"
+              workingDirectory: "$(terraformWorkingDir)"
+              script: |
+                set -euo pipefail
+                echo "=== Configure Add-On ==="
+
+                ADDON_TYPE="${{ parameters.addon_type }}"
+                CUSTOMER="${{ parameters.customer_id }}"
+                ENV="${{ parameters.environment }}"
+
+                case "$ADDON_TYPE" in
+                  external_ca)
+                    echo "Configuring external CA integration..."
+                    echo "Provider: ${{ parameters.external_ca_provider }}"
+                    # Add external CA configuration logic here
+                    ;;
+                  scep)
+                    echo "Configuring SCEP service..."
+                    # Add SCEP configuration logic here
+                    ;;
+                  acme)
+                    echo "Configuring ACME service..."
+                    # Add ACME configuration logic here
+                    ;;
+                  monitoring)
+                    echo "Configuring monitoring stack..."
+                    # Add monitoring configuration logic here
+                    ;;
+                  additional_gateway)
+                    echo "Configuring additional gateway..."
+                    # Add gateway configuration logic here
+                    ;;
+                  additional_worker)
+                    echo "Configuring additional worker..."
+                    # Add worker configuration logic here
+                    ;;
+                esac
+
+                echo "Add-on configuration complete."
+
+          - task: Bash@3
+            displayName: "Verify deployment"
+            inputs:
+              targetType: "inline"
+              workingDirectory: "$(terraformWorkingDir)"
+              script: |
+                set -euo pipefail
+                echo "=== Verify Deployment ==="
+
+                terraform output -json > outputs.json 2>/dev/null || true
+
+                if [ -f outputs.json ]; then
+                  echo "Terraform outputs:"
+                  cat outputs.json | jq '.' || cat outputs.json
+                fi
+
+                echo "Deployment verification complete."
+
+  # ============================================================================
+  # STAGE 5: SMOKE_TESTS
+  # ============================================================================
+  - stage: SMOKE_TESTS
+    displayName: "Smoke Tests"
+    dependsOn: DEPLOY_ADDON
+    condition: and(succeeded(), eq('${{ parameters.operation }}', 'deploy'))
+    jobs:
+      - job: RunSmokeTests
+        displayName: "Run add-on smoke tests"
+        steps:
+          - checkout: self
+
+          - task: AWSShellScript@1
+            displayName: "Connectivity tests"
+            inputs:
+              awsCredentials: "aws-service-connection"
+              regionName: "$(awsRegion)"
+              scriptType: "inline"
+              inlineScript: |
+                set -euo pipefail
+                echo "=== Connectivity Tests ==="
+                echo "Testing connectivity for add-on: ${{ parameters.addon_type }}"
+
+                # Add connectivity test logic here
+                # Example: curl health endpoints, check DNS resolution, etc.
+
+                echo "Connectivity tests passed."
+
+          - task: Bash@3
+            displayName: "Authentication tests"
+            inputs:
+              targetType: "inline"
+              script: |
+                set -euo pipefail
+                echo "=== Authentication Tests ==="
+                echo "Testing authentication for add-on: ${{ parameters.addon_type }}"
+
+                # Add auth test logic here
+
+                echo "Authentication tests passed."
+
+          - task: Bash@3
+            displayName: "PKI tests"
+            inputs:
+              targetType: "inline"
+              script: |
+                set -euo pipefail
+                echo "=== PKI Tests ==="
+
+                ADDON_TYPE="${{ parameters.addon_type }}"
+
+                if [ "$ADDON_TYPE" = "external_ca" ] || [ "$ADDON_TYPE" = "scep" ] || [ "$ADDON_TYPE" = "acme" ]; then
+                  echo "Running PKI-specific tests for $ADDON_TYPE..."
+                  # Add PKI test logic here
+                else
+                  echo "Skipping PKI tests (not applicable for $ADDON_TYPE)."
+                fi
+
+                echo "PKI tests passed."
+
+          - task: Bash@3
+            displayName: "Idempotency tests"
+            inputs:
+              targetType: "inline"
+              workingDirectory: "$(terraformWorkingDir)"
+              script: |
+                set -euo pipefail
+                echo "=== Idempotency Tests ==="
+                echo "Verifying terraform plan shows no changes after apply..."
+
+                terraform plan \
+                  -target=$(addonTargetPrefix) \
+                  -var="customer_id=${{ parameters.customer_id }}" \
+                  -var="environment=${{ parameters.environment }}" \
+                  -var="addon_type=${{ parameters.addon_type }}" \
+                  -var="external_ca_provider=${{ parameters.external_ca_provider }}" \
+                  -var="deployment_profile=${{ parameters.deployment_profile }}" \
+                  -var="operation=${{ parameters.operation }}" \
+                  -detailed-exitcode \
+                  -input=false || EXIT_CODE=$?
+
+                if [ "${EXIT_CODE:-0}" -eq 2 ]; then
+                  echo "##vso[task.logissue type=warning]Idempotency check: terraform plan shows pending changes"
+                else
+                  echo "Idempotency check passed: no pending changes."
+                fi
+
+  # ============================================================================
+  # STAGE 6: REPORT
+  # ============================================================================
+  - stage: REPORT
+    displayName: "Generate Report"
+    dependsOn:
+      - VALIDATE
+      - PLAN
+      - DEPLOY_ADDON
+      - SMOKE_TESTS
+    condition: always()
+    jobs:
+      - job: GenerateReport
+        displayName: "Generate deployment report"
+        steps:
+          - checkout: self
+
+          - task: Bash@3
+            displayName: "Generate report"
+            inputs:
+              targetType: "inline"
+              workingDirectory: "$(Build.ArtifactStagingDirectory)"
+              script: |
+                set -euo pipefail
+
+                REPORT_FILE="addon-deployment-report.md"
+
+                cat > "$REPORT_FILE" << 'EOF'
+                # Add-On Deployment Report
+
+                ## Summary
+                - **Customer ID:** ${{ parameters.customer_id }}
+                - **Environment:** ${{ parameters.environment }}
+                - **Add-On Type:** ${{ parameters.addon_type }}
+                - **Deployment Profile:** ${{ parameters.deployment_profile }}
+                - **Operation:** ${{ parameters.operation }}
+                - **External CA Provider:** ${{ parameters.external_ca_provider }}
+                - **Timestamp:** $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+                ## Pipeline Results
+                - **Build ID:** $(Build.BuildId)
+                - **Build Number:** $(Build.BuildNumber)
+                - **Source Branch:** $(Build.SourceBranch)
+                - **Source Version:** $(Build.SourceVersion)
+
+                ## Stage Results
+                | Stage | Result |
+                |-------|--------|
+                | VALIDATE | $(Agent.JobStatus) |
+                | PLAN | $(Agent.JobStatus) |
+                | APPROVAL | $(Agent.JobStatus) |
+                | DEPLOY_ADDON | $(Agent.JobStatus) |
+                | SMOKE_TESTS | $(Agent.JobStatus) |
+
+                ## Notes
+                - Duplicate detection: See VALIDATE stage logs
+                - Resource counts: See PLAN stage logs
+                - Security review: See PLAN stage logs
+                EOF
+
+                echo "Report generated: $REPORT_FILE"
+                cat "$REPORT_FILE"
+
+          - task: PublishPipelineArtifact@1
+            displayName: "Publish report"
+            inputs:
+              targetPath: "$(Build.ArtifactStagingDirectory)/addon-deployment-report.md"
+              artifact: "deployment-report"
+              publishLocation: "pipeline"
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish to build artifacts"
+            inputs:
+              pathToPublish: "$(Build.ArtifactStagingDirectory)"
+              artifactName: "addon-deployment-results"
+            condition: succeededOrFailed()

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "gcp",
+  "ownerHandle": "ivangdavila",
+  "installedVersion": "1.0.2",
+  "installedAt": 1788406590719,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "6ff88370a38d2b1c64aae31f4518875f57f010831276edd79735a876883a2b15",
+    "integrity": "sha256-b/iDcKONKxxkquMfRRiHX1fwEIMSdu3XlzWodog6KxU="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "aa5942295d89dafe808f9261fe1940d6220a36c873c11736172cf70281080bc7"
+  }
+}

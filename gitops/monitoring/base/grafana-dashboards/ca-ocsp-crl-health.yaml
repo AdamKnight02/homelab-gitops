@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dash-ca-ocsp-crl-health
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: PKI Platform
+data:
+  ca-ocsp-crl-health.json: |
+    {
+      "uid": "pki-ca-ocsp-crl",
+      "title": "CA / OCSP / CRL Health",
+      "tags": ["pki", "ca", "ocsp", "crl"],
+      "timezone": "browser",
+      "refresh": "30s",
+      "time": {"from": "now-6h", "to": "now"},
+      "panels": [
+        {
+          "id": 1, "type": "stat", "title": "CA Up",
+          "gridPos": {"h": 5, "w": 4, "x": 0, "y": 0},
+          "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}]}},
+          "targets": [{"expr": "max(up{component=\"ejbca\"})"}]
+        },
+        {
+          "id": 2, "type": "stat", "title": "OCSP Probe",
+          "gridPos": {"h": 5, "w": 4, "x": 4, "y": 0},
+          "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "FAIL", "color": "red"}, "1": {"text": "OK", "color": "green"}}}]}},
+          "targets": [{"expr": "min(probe_success{service=\"ocsp\"})"}]
+        },
+        {
+          "id": 3, "type": "stat", "title": "CRL Probe",
+          "gridPos": {"h": 5, "w": 4, "x": 8, "y": 0},
+          "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "FAIL", "color": "red"}, "1": {"text": "OK", "color": "green"}}}]}},
+          "targets": [{"expr": "min(probe_success{service=\"crl\"})"}]
+        },
+        {
+          "id": 4, "type": "stat", "title": "CRL Age",
+          "gridPos": {"h": 5, "w": 4, "x": 12, "y": 0},
+          "fieldConfig": {"defaults": {"unit": "s", "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 43200}, {"color": "red", "value": 86400}]}}},
+          "targets": [{"expr": "time() - max(pki_crl_last_update_timestamp_seconds)"}]
+        },
+        {
+          "id": 5, "type": "stat", "title": "CA Cert Days Left",
+          "gridPos": {"h": 5, "w": 4, "x": 16, "y": 0},
+          "fieldConfig": {"defaults": {"unit": "d", "thresholds": {"steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 90}, {"color": "green", "value": 180}]}}},
+          "targets": [{"expr": "min((pki_ca_certificate_not_after_timestamp_seconds - time()) / 86400)"}]
+        },
+        {
+          "id": 6, "type": "stat", "title": "Revoked (total)",
+          "gridPos": {"h": 5, "w": 4, "x": 20, "y": 0},
+          "targets": [{"expr": "sum(pki_certificates_revoked_total)"}]
+        },
+        {
+          "id": 7, "type": "timeseries", "title": "OCSP Latency (p50/p95/p99)",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
+          "fieldConfig": {"defaults": {"unit": "s"}},
+          "targets": [
+            {"expr": "histogram_quantile(0.50, rate(probe_duration_seconds_bucket{service=\"ocsp\"}[5m]))", "legendFormat": "p50"},
+            {"expr": "histogram_quantile(0.95, rate(probe_duration_seconds_bucket{service=\"ocsp\"}[5m]))", "legendFormat": "p95"},
+            {"expr": "histogram_quantile(0.99, rate(probe_duration_seconds_bucket{service=\"ocsp\"}[5m]))", "legendFormat": "p99"}
+          ]
+        },
+        {
+          "id": 8, "type": "timeseries", "title": "OCSP Responses by Status",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
+          "targets": [{"expr": "sum(rate(pki_ocsp_responses_total[5m])) by (status)", "legendFormat": "{{ status }}"}]
+        },
+        {
+          "id": 9, "type": "timeseries", "title": "CRL Publish Events & Size",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
+          "targets": [
+            {"expr": "increase(pki_crl_publish_total[1h])", "legendFormat": "publishes/h"},
+            {"expr": "pki_crl_size_bytes", "legendFormat": "CRL bytes"}
+          ]
+        },
+        {
+          "id": 10, "type": "timeseries", "title": "CA Signing Operations",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
+          "targets": [{"expr": "sum(rate(pki_ca_sign_operations_total[5m])) by (ca_name, key_type)", "legendFormat": "{{ ca_name }} {{ key_type }}"}]
+        }
+      ],
+      "schemaVersion": 39,
+      "version": 1
+    }

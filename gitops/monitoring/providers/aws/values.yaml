@@ -1,0 +1,41 @@
+# AWS provider overlay — EKS.
+# - gp3 EBS CSI storage
+# - node-exporter disabled: EKS node metrics via CloudWatch container
+#   insights; enable only for self-managed node groups if desired.
+# - NLB for Grafana (internal)
+prometheus:
+  prometheusSpec:
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+  service:
+    type: ClusterIP
+
+alertmanager:
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+
+grafana:
+  persistence:
+    storageClassName: gp3
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+      service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+  # IAM Roles for Service Accounts (IRSA) for remote write to Amazon
+  # Managed Prometheus in enterprise tier:
+  # serviceAccount:
+  #   annotations:
+  #     eks.amazonaws.com/role-arn: arn:aws:iam::<acct>:role/pki-monitoring-amp
+
+prometheus-node-exporter:
+  enabled: false

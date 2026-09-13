@@ -1,0 +1,37 @@
+---
+# Homelab Image Registry Patch
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cert-api
+  namespace: pki
+spec:
+  template:
+    spec:
+      containers:
+      - name: api
+        image: 10.42.0.88:5000/cert-api:latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cert-worker
+  namespace: pki
+spec:
+  template:
+    spec:
+      containers:
+      - name: worker
+        image: 10.42.0.88:5000/cert-worker:latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ca-service
+  namespace: pki
+spec:
+  template:
+    spec:
+      containers:
+      - name: service
+        image: 10.42.0.88:5000/ca-service:latest

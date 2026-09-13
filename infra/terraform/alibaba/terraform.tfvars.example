@@ -1,0 +1,94 @@
+# =============================================================================
+# Alibaba Cloud PKI Platform — Example Variables
+# =============================================================================
+# Copy this file to terraform.tfvars and customize for your environment.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Alibaba Cloud Account and Region
+# ---------------------------------------------------------------------------
+# alibaba_region = "cn-hangzhou"
+# alibaba_access_key = "your-access-key"
+# alibaba_secret_key = "your-secret-key"
+
+# ---------------------------------------------------------------------------
+# Service Tier
+# ---------------------------------------------------------------------------
+# Options: ECONOMY, STANDARD, ENTERPRISE
+service_tier = "ECONOMY"
+
+# ---------------------------------------------------------------------------
+# Resource Naming
+# ---------------------------------------------------------------------------
+name_prefix = "pki"
+project_name = "pki-cloudlab"
+environment = "lab"
+owner = "homelab-admin"
+managed_by = "terraform"
+ephemeral = true
+cost_center = "homelab"
+
+# ---------------------------------------------------------------------------
+# Network Configuration
+# ---------------------------------------------------------------------------
+network_cidr = "10.0.0.0/16"
+subnet_cidr = "10.0.1.0/24"
+allow_ssh_cidr = []
+allow_k8s_api_cidr = []
+
+# ---------------------------------------------------------------------------
+# Compute Configuration
+# ---------------------------------------------------------------------------
+# instance_type = "ecs.t6-c1m2.large"
+# instance_count = 1
+# system_disk_category = "cloud_efficiency"
+# system_disk_size = 30
+admin_username = "root"
+# ssh_public_key = "ssh-ed25519 AAAA..."
+internet_max_bandwidth_out = 0
+
+# ---------------------------------------------------------------------------
+# Database Configuration
+# ---------------------------------------------------------------------------
+# create_rds = false
+# rds_instance_type = "pg.n2.medium.2c"
+# rds_ha_enabled = false
+
+# ---------------------------------------------------------------------------
+# Storage Configuration
+# ---------------------------------------------------------------------------
+# create_oss = false
+# oss_versioning = false
+
+# ---------------------------------------------------------------------------
+# Load Balancer Configuration
+# ---------------------------------------------------------------------------
+# create_slb = false
+# slb_type = "slb"
+
+# ---------------------------------------------------------------------------
+# Security Configuration
+# ---------------------------------------------------------------------------
+# create_ram_role = false
+# create_kms_key = false
+
+# ---------------------------------------------------------------------------
+# Kubernetes Configuration
+# ---------------------------------------------------------------------------
+k3s_version = "v1.30"
+argocd_version = "v2.12"
+git_repo_url = "https://github.com/AdamKnight02/homelab-gitops.git"
+git_target_revision = "main"
+
+# ---------------------------------------------------------------------------
+# Monitoring Configuration
+# ---------------------------------------------------------------------------
+# enable_monitoring = false
+# enable_cloudmonitor = false
+
+# ---------------------------------------------------------------------------
+# Cost Guardrails
+# ---------------------------------------------------------------------------
+enable_cost_guardrails = true
+max_instance_count = 10
+max_disk_size = 500

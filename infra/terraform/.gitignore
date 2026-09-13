@@ -1,0 +1,57 @@
+# Terraform
+.terraform/
+terraform.tfstate
+terraform.tfstate.*
+*.tfplan
+*.tfplan.*
+crash.log
+crash.*.log
+
+# Terraform override files (local-only)
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Terraform variable files with secrets
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+# Terraform lock file (commit for team consistency, ignore for solo)
+# .terraform.lock.hcl
+
+# SSH keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+id_rsa*
+id_ed25519*
+
+# Cloud provider credentials
+*.json.credentials
+aws-credentials*
+azure-credentials*
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

@@ -1,0 +1,32 @@
+---
+# Azure Overlay - Azure Environment (PLAN-ONLY)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: pki
+
+resources:
+  - ../../base
+
+# Azure-specific patches
+patches:
+  - path: storage-class-patch.yaml
+  - path: image-registry-patch.yaml
+  - path: trust-domain-patch.yaml
+
+# Azure-specific labels
+commonLabels:
+  environment: azure
+  trust-domain: pki-azure.local
+
+# Azure-specific images (placeholder for ACR)
+images:
+  - name: registry/cert-api
+    newName: pkiazurecr.azurecr.io/cert-api
+    newTag: latest
+  - name: registry/cert-worker
+    newName: pkiazurecr.azurecr.io/cert-worker
+    newTag: latest
+  - name: registry/ca-service
+    newName: pkiazurecr.azurecr.io/ca-service
+    newTag: latest

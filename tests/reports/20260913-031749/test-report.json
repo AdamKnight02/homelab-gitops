@@ -1,0 +1,218 @@
+{
+  "report_version": "1.0",
+  "generated_at": "2026-09-13T03:18:27.711409+00:00",
+  "environment": {
+    "timestamp": "2026-09-13T03:17:49.862692+00:00",
+    "hostname": "fedora",
+    "python_version": "3.14.6 (main, Jun 11 2026, 00:00:00) [GCC 16.1.1 20260515 (Red Hat 16.1.1-2)]",
+    "project_root": "/home/frostnode/.openclaw/workspace",
+    "tool_terraform": "/home/frostnode/.local/bin/terraform",
+    "tool_kubectl": "/home/frostnode/.local/bin/kubectl",
+    "tool_helm": null,
+    "tool_kustomize": null,
+    "tool_pwsh": null,
+    "tool_jq": "/usr/bin/jq",
+    "tool_yq": null,
+    "git_commit": "unknown",
+    "git_branch": "master"
+  },
+  "summary": {
+    "total_suites": 1,
+    "total_tests": 13,
+    "total_passed": 10,
+    "total_failed": 2,
+    "total_skipped": 1,
+    "total_blocked": 0,
+    "total_errors": 0,
+    "overall_status": "FAIL",
+    "total_duration_ms": 37663.59
+  },
+  "suites": [
+    {
+      "name": "Static Validation",
+      "level": 1,
+      "description": "Schema, format, and structural validation",
+      "duration_ms": 37663.59,
+      "total": 13,
+      "passed": 10,
+      "failed": 2,
+      "skipped": 1,
+      "blocked": 0,
+      "errors": 0,
+      "overall_status": "FAIL",
+      "results": [
+        {
+          "test_id": "L1-TF-FMT",
+          "name": "Terraform Format",
+          "level": 1,
+          "status": "PASS",
+          "message": "All Terraform files properly formatted",
+          "duration_ms": 1101.51,
+          "details": {},
+          "remediation": "",
+          "timestamp": "2026-09-13T03:17:51.149167+00:00"
+        },
+        {
+          "test_id": "L1-TF-VALIDATE-AZURE",
+          "name": "Terraform Validate (Azure)",
+          "level": 1,
+          "status": "PASS",
+          "message": "terraform validate passed for azure",
+          "duration_ms": 5877.17,
+          "details": {},
+          "remediation": "",
+          "timestamp": "2026-09-13T03:17:57.026342+00:00"
+        },
+        {
+          "test_id": "L1-TF-VALIDATE-AWS",
+          "name": "Terraform Validate (AWS)",
+          "level": 1,
+          "status": "PASS",
+          "message": "terraform validate passed for aws",
+          "duration_ms": 28236.6,
+          "details": {},
+          "remediation": "",
+          "timestamp": "2026-09-13T03:18:25.262965+00:00"
+        },
+        {
+          "test_id": "L1-YAML-SYNTAX",
+          "name": "YAML Syntax",
+          "level": 1,
+          "status": "PASS",
+          "message": "All 118 YAML files have valid syntax",
+          "duration_ms": 1804.64,
+          "details": {},
+          "remediation": "",
+          "timestamp": "2026-09-13T03:18:27.067597+00:00"
+        },
+        {
+          "test_id": "L1-K8S-MANIFEST",
+          "name": "K8s Manifest Structure",
+          "level": 1,
+          "status": "FAIL",
+          "message": "K8s manifest structural issues in 19 documents",
+          "duration_ms": 408.88,
+          "details": {
+            "issues": [
+              "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/cert-manager/values.yaml: missing 'apiVersion'",
+              "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/cert-manager/values.yaml: missing 'kind'",
+              "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/cert-manager/values.yaml: missing 'metadata'",
+              "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/ejbca/values.yaml: missing 'apiVersion'",
+              "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/ejbca/values.yaml: missing 'kind'",
+              "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/ejbca/values.yaml: missing 'metadata'",
+              "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/openbao/kustomization.yaml: missing 'metadata'",
+              "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/openbao/values.yaml: missing 'apiVersion'",
+              "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/openbao/values.yaml: missing 'kind'",
+              "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/openbao/values.yaml: missing 'metadata'",
+              "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/pki/kustomization.yaml: missing 'metadata'",
+              "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/postgres/values.yaml: missing 'apiVersion'",
+              "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/postgres/values.yaml: missing 'kind'",
+              "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/postgres/values.yaml: missing 'metadata'",
+              "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/spire/kustomization.yaml: missing 'metadata'",
+              "/home/frostnode/.openclaw/workspace/docs/cloud/manifests/base/kustomization.yaml: missing 'metadata'",
+              "/home/frostnode/.openclaw/workspace/docs/cloud/manifests/overlays/aws/kustomization.yaml: missing 'metadata'",
+              "/home/frostnode/.openclaw/workspace/docs/cloud/manifests/overlays/azure/kustomization.yaml: missing 'metadata'",
+              "/home/frostnode/.openclaw/workspace/docs/cloud/manifests/overlays/homelab/kustomization.yaml: missing 'metadata'"
+            ]
+          },
+          "remediation": "",
+          "timestamp": "2026-09-13T03:18:27.476498+00:00"
+        },
+        {
+          "test_id": "L1-ARGOCD-APP",
+          "name": "ArgoCD Application Structure",
+          "level": 1,
+          "status": "PASS",
+          "message": "All 7 ArgoCD Applications properly structured",
+          "duration_ms": 32.43,
+          "details": {},
+          "remediation": "",
+          "timestamp": "2026-09-13T03:18:27.508943+00:00"
+        },
+        {
+          "test_id": "L1-KUSTOMIZE",
+          "name": "Kustomization Structure",
+          "level": 1,
+          "status": "PASS",
+          "message": "All 14 kustomization files reference valid resources",
+          "duration_ms": 45.79,
+          "details": {},
+          "remediation": "",
+          "timestamp": "2026-09-13T03:18:27.554729+00:00"
+        },
+        {
+          "test_id": "L1-GITOPS",
+          "name": "GitOps Directory Structure",
+          "level": 1,
+          "status": "PASS",
+          "message": "GitOps directory structure is valid",
+          "duration_ms": 0.25,
+          "details": {},
+          "remediation": "",
+          "timestamp": "2026-09-13T03:18:27.554998+00:00"
+        },
+        {
+          "test_id": "L1-TF-VARS",
+          "name": "Terraform Variable Defaults",
+          "level": 1,
+          "status": "PASS",
+          "message": "Terraform variables have proper defaults and validation",
+          "duration_ms": 0.38,
+          "details": {},
+          "remediation": "",
+          "timestamp": "2026-09-13T03:18:27.555376+00:00"
+        },
+        {
+          "test_id": "L1-NO-SECRETS",
+          "name": "No Secrets in Code",
+          "level": 1,
+          "status": "FAIL",
+          "message": "Potential secrets found in 1 locations",
+          "duration_ms": 148.58,
+          "details": {
+            "findings": [
+              "/home/frostnode/.openclaw/workspace/infra/terraform/modules/aws/secrets/secrets.tf: potential hardcoded password"
+            ]
+          },
+          "remediation": "Move secrets to environment variables, K8s Secrets, or OpenBao",
+          "timestamp": "2026-09-13T03:18:27.703955+00:00"
+        },
+        {
+          "test_id": "L1-TAGGING",
+          "name": "Tagging Standards",
+          "level": 1,
+          "status": "PASS",
+          "message": "All 6 required tags defined",
+          "duration_ms": 0.14,
+          "details": {},
+          "remediation": "",
+          "timestamp": "2026-09-13T03:18:27.704113+00:00"
+        },
+        {
+          "test_id": "L1-NETPOL",
+          "name": "Network Policy Presence",
+          "level": 1,
+          "status": "PASS",
+          "message": "NetworkPolicies present for all PKI components",
+          "duration_ms": 0.1,
+          "details": {},
+          "remediation": "",
+          "timestamp": "2026-09-13T03:18:27.704223+00:00"
+        },
+        {
+          "test_id": "L1-PWSH",
+          "name": "PowerShell Availability",
+          "level": 1,
+          "status": "SKIP",
+          "message": "PowerShell (pwsh) not available \u2014 Windows-specific tests will use static validation fallback",
+          "duration_ms": 7.03,
+          "details": {
+            "fallback": "Static YAML/schema validation will be used instead of PowerShell scripts"
+          },
+          "remediation": "",
+          "timestamp": "2026-09-13T03:18:27.711243+00:00"
+        }
+      ]
+    }
+  ]
+}

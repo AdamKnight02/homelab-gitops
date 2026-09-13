@@ -1,0 +1,70 @@
+================================================================================
+PKI PLATFORM TEST REPORT
+Generated: 2026-09-13T03:18:27.712759+00:00
+================================================================================
+
+ENVIRONMENT
+----------------------------------------
+  timestamp: 2026-09-13T03:17:49.862692+00:00
+  hostname: fedora
+  python_version: 3.14.6 (main, Jun 11 2026, 00:00:00) [GCC 16.1.1 20260515 (Red Hat 16.1.1-2)]
+  project_root: /home/frostnode/.openclaw/workspace
+  tool_terraform: /home/frostnode/.local/bin/terraform
+  tool_kubectl: /home/frostnode/.local/bin/kubectl
+  tool_helm: None
+  tool_kustomize: None
+  tool_pwsh: None
+  tool_jq: /usr/bin/jq
+  tool_yq: None
+  git_commit: unknown
+  git_branch: master
+
+SUMMARY
+----------------------------------------
+  Overall Status: FAIL
+  Total Tests:    13
+  Passed:         10
+  Failed:         2
+  Skipped:        1
+  Blocked:        0
+  Errors:         0
+
+LEVEL 1: Static Validation
+  Status: ❌ FAIL
+  Tests: 13 | Pass: 10 | Fail: 2 | Skip: 1 | Block: 0
+  Duration: 37664ms
+
+  ✅ [L1-TF-FMT] Terraform Format
+     Message: All Terraform files properly formatted
+  ✅ [L1-TF-VALIDATE-AZURE] Terraform Validate (Azure)
+     Message: terraform validate passed for azure
+  ✅ [L1-TF-VALIDATE-AWS] Terraform Validate (AWS)
+     Message: terraform validate passed for aws
+  ✅ [L1-YAML-SYNTAX] YAML Syntax
+     Message: All 118 YAML files have valid syntax
+  ❌ [L1-K8S-MANIFEST] K8s Manifest Structure
+     Message: K8s manifest structural issues in 19 documents
+     issues: ["/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/cert-manager/values.yaml: missing 'apiVersion'", "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/cert-manager/values.yaml: missing 'kind'", "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/cert-manager/values.yaml: missing 'metadata'", "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/ejbca/values.yaml: missing 'apiVersion'", "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/ejbca/values.yaml: missing 'kind'", "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/ejbca/values.yaml: missing 'metadata'", "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/openbao/kustomization.yaml: missing 'metadata'", "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/openbao/values.yaml: missing 'apiVersion'", "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/openbao/values.yaml: missing 'kind'", "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/openbao/values.yaml: missing 'metadata'", "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/pki/kustomization.yaml: missing 'metadata'", "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/postgres/values.yaml: missing 'apiVersion'", "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/postgres/values.yaml: missing 'kind'", "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/postgres/values.yaml: missing 'metadata'", "/home/frostnode/.openclaw/workspace/machine-identity-platform/apps/spire/kustomization.yaml: missing 'metadata'", "/home/frostnode/.openclaw/workspace/docs/cloud/manifests/base/kustomization.yaml: missing 'metadata'", "/home/frostnode/.openclaw/workspace/docs/cloud/manifests/overlays/aws/kustomization.yaml: missing 'metadata'", "/home/frostnode/.openclaw/workspace/docs/cloud/manifests/overlays/azure/kustomization.yaml: missing 'metadata'", "/home/frostnode/.openclaw/workspace/docs/cloud/manifests/overlays/homelab/kustomization.yaml: missing 'metadata'"]
+  ✅ [L1-ARGOCD-APP] ArgoCD Application Structure
+     Message: All 7 ArgoCD Applications properly structured
+  ✅ [L1-KUSTOMIZE] Kustomization Structure
+     Message: All 14 kustomization files reference valid resources
+  ✅ [L1-GITOPS] GitOps Directory Structure
+     Message: GitOps directory structure is valid
+  ✅ [L1-TF-VARS] Terraform Variable Defaults
+     Message: Terraform variables have proper defaults and validation
+  ❌ [L1-NO-SECRETS] No Secrets in Code
+     Message: Potential secrets found in 1 locations
+     Fix: Move secrets to environment variables, K8s Secrets, or OpenBao
+     findings: ['/home/frostnode/.openclaw/workspace/infra/terraform/modules/aws/secrets/secrets.tf: potential hardcoded password']
+  ✅ [L1-TAGGING] Tagging Standards
+     Message: All 6 required tags defined
+  ✅ [L1-NETPOL] Network Policy Presence
+     Message: NetworkPolicies present for all PKI components
+  ⏭️ [L1-PWSH] PowerShell Availability
+     Message: PowerShell (pwsh) not available — Windows-specific tests will use static validation fallback
+     fallback: Static YAML/schema validation will be used instead of PowerShell scripts
+
+================================================================================
+END OF REPORT
+================================================================================

@@ -1,0 +1,184 @@
+# ServiceMonitors for platform PKI components.
+# All carry monitoring.pki.platform.io/enabled: "true" so the platform
+# Prometheus selects them (see base/prometheus-stack/values.yaml).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cert-manager
+  namespace: monitoring
+  labels:
+    monitoring.pki.platform.io/enabled: "true"
+    app.kubernetes.io/part-of: machine-identity-platform
+    component: cert-manager
+spec:
+  namespaceSelector:
+    matchNames: [cert-manager]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cert-manager
+  endpoints:
+    - port: http-metrics
+      interval: 30s
+---
+# EJBCA exposes Prometheus metrics on its management endpoint when
+# METRICS_ENABLED=true. If not enabled, the blackbox probes still cover
+# OCSP/CRL/ACME/SCEP health.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ejbca
+  namespace: monitoring
+  labels:
+    monitoring.pki.platform.io/enabled: "true"
+    app.kubernetes.io/part-of: machine-identity-platform
+    component: ejbca
+spec:
+  namespaceSelector:
+    matchNames: [ejbca]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ejbca-ce
+  endpoints:
+    - port: http
+      path: /ejbca/publicweb/healthz
+      interval: 30s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pki-cert-api
+  namespace: monitoring
+  labels:
+    monitoring.pki.platform.io/enabled: "true"
+    app.kubernetes.io/part-of: machine-identity-platform
+    component: cert-api
+spec:
+  namespaceSelector:
+    matchNames: [pki]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cert-api
+  endpoints:
+    - port: metrics
+      interval: 15s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pki-cert-worker
+  namespace: monitoring
+  labels:
+    monitoring.pki.platform.io/enabled: "true"
+    app.kubernetes.io/part-of: machine-identity-platform
+    component: cert-worker
+spec:
+  namespaceSelector:
+    matchNames: [pki]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cert-worker
+  endpoints:
+    - port: metrics
+      interval: 15s
+---
+# RabbitMQ — uses the rabbitmq-prometheus plugin (management UI port 15692).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: rabbitmq
+  namespace: monitoring
+  labels:
+    monitoring.pki.platform.io/enabled: "true"
+    app.kubernetes.io/part-of: machine-identity-platform
+    component: rabbitmq
+spec:
+  namespaceSelector:
+    matchNames: [pki]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq
+  endpoints:
+    - port: prometheus
+      interval: 15s
+---
+# SPIRE server/agent metrics (OTel or Prometheus endpoint).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: spire-server
+  namespace: monitoring
+  labels:
+    monitoring.pki.platform.io/enabled: "true"
+    app.kubernetes.io/part-of: machine-identity-platform
+    component: spire
+spec:
+  namespaceSelector:
+    matchNames: [spire]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spire-server
+  endpoints:
+    - port: metrics
+      interval: 30s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: spire-agent
+  namespace: monitoring
+  labels:
+    monitoring.pki.platform.io/enabled: "true"
+    app.kubernetes.io/part-of: machine-identity-platform
+    component: spire
+spec:
+  namespaceSelector:
+    matchNames: [spire]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spire-agent
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s
+---
+# OpenBao / Vault — Prometheus telemetry listener.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: openbao
+  namespace: monitoring
+  labels:
+    monitoring.pki.platform.io/enabled: "true"
+    app.kubernetes.io/part-of: machine-identity-platform
+    component: secrets
+spec:
+  namespaceSelector:
+    matchNames: [openbao]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openbao
+  endpoints:
+    - port: http
+      path: /v1/sys/metrics?format=prometheus
+      interval: 30s
+      # Requires a prometheus-format token; supplied via bearerTokenSecret
+      # per environment overlay.
+---
+# PostgreSQL — via postgres exporter sidecar or cnpg metrics.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: postgres
+  namespace: monitoring
+  labels:
+    monitoring.pki.platform.io/enabled: "true"
+    app.kubernetes.io/part-of: machine-identity-platform
+    component: database
+spec:
+  namespaceSelector:
+    matchNames: [postgres]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql
+  endpoints:
+    - port: metrics
+      interval: 30s

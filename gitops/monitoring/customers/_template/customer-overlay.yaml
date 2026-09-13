@@ -1,0 +1,104 @@
+# Customer monitoring overlay template.
+#
+# Copy this directory to gitops/monitoring/customers/<customer-id>/ and
+# replace __CUSTOMER_ID__ / __TIER__ placeholders. This overlay gives each
+# customer:
+#   1. A dedicated Grafana Organization (UI isolation)
+#   2. A customer label on all their metrics (query isolation)
+#   3. Their own AlertmanagerConfig receiver (alert routing isolation)
+#   4. Optional: dedicated Prometheus remote-write tenant (enterprise)
+#
+# Customer namespaces opt into monitoring by labeling ServiceMonitors:
+#   monitoring.pki.platform.io/enabled: "true"
+#   monitoring.pki.platform.io/customer: "<customer-id>"
+
+# ---------------------------------------------------------------------------
+# 1. AlertmanagerConfig — routes customer-tagged alerts to the customer's
+#    receiver (email/webhook/PagerDuty). Secrets referenced, never inline.
+# ---------------------------------------------------------------------------
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: customer-__CUSTOMER_ID__
+  namespace: monitoring
+  labels:
+    monitoring.pki.platform.io/enabled: "true"
+    monitoring.pki.platform.io/customer: __CUSTOMER_ID__
+spec:
+  route:
+    receiver: customer-__CUSTOMER_ID__
+    matchers:
+      - name: customer
+        value: __CUSTOMER_ID__
+        matchType: "="
+    group_by: ["alertname", "namespace"]
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
+  receivers:
+    - name: customer-__CUSTOMER_ID__
+      emailConfigs:
+        - to: __CUSTOMER_ALERT_EMAIL__
+          sendResolved: true
+      # webhookConfigs:
+      #   - url: https://hooks.slack.com/services/...   # via Secret ref in real deployments
+---
+# ---------------------------------------------------------------------------
+# 2. Grafana datasource ConfigMap — a per-customer Prometheus datasource
+#    that enforces the customer label via query middleware. In Grafana
+#    Enterprise this maps to the customer's Org; in OSS we use folder
+#    permissions + a restricted datasource.
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-ds-customer-__CUSTOMER_ID__
+  namespace: monitoring
+  labels:
+    grafana_datasource: "1"
+    monitoring.pki.platform.io/customer: __CUSTOMER_ID__
+data:
+  datasource.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus-__CUSTOMER_ID__
+        type: prometheus
+        access: proxy
+        url: http://monitoring-kube-prometheus-prometheus.monitoring.svc:9090
+        isDefault: false
+        jsonData:
+          httpMethod: POST
+          # PromQL-level isolation: every query from this datasource is
+          # constrained to the customer's metrics. Enforced by convention
+          # in dashboards; for hard multi-tenancy use enterprise tier with
+          # per-tenant remote write + Grafana orgs.
+          customQueryParameters: "tenant=__CUSTOMER_ID__"
+---
+# ---------------------------------------------------------------------------
+# 3. Example customer ServiceMonitor — scrapes the customer's PKI workloads
+#    in their namespace. Replace namespace/selector per customer.
+# ---------------------------------------------------------------------------
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: customer-__CUSTOMER_ID__-workloads
+  namespace: monitoring
+  labels:
+    monitoring.pki.platform.io/enabled: "true"
+    monitoring.pki.platform.io/customer: __CUSTOMER_ID__
+spec:
+  namespaceSelector:
+    matchNames:
+      - customer-__CUSTOMER_ID__
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: machine-identity-platform
+  endpoints:
+    - port: metrics
+      interval: 30s
+      relabelings:
+        # Stamp every sample with the customer label for isolation.
+        - targetLabel: customer
+          replacement: __CUSTOMER_ID__
+        - targetLabel: tier
+          replacement: __TIER__

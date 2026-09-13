@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "ai-automation-workflows",
+  "installedVersion": "0.1.5",
+  "installedAt": 1788400553267,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "001e00dc0dd526405c547908d99eca7537ffc226eb7866a75bdc1788b4bfb822",
+    "integrity": "sha256-AB4A3A3VJkBcVHkI2Z7KdTf/wibreGanW9wXiLS/uCI="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "4e17664a33b30622521a09a85b40ae47030a5dc3ca566487b5550633fa551b4b"
+  }
+}

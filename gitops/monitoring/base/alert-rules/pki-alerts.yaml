@@ -1,0 +1,254 @@
+# PKI platform alert rules — versioned as PrometheusRule CRs.
+# Severity model:
+#   critical — service-impacting, page immediately (CA down, OCSP down, HSM)
+#   warning  — degrading, investigate during business hours
+#   info     — capacity/lifecycle signals for planning
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pki-platform-alerts
+  namespace: monitoring
+  labels:
+    monitoring.pki.platform.io/enabled: "true"
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  groups:
+    # ------------------------------------------------------------------
+    - name: pki.ca-health
+      rules:
+        - alert: CertificateAuthorityDown
+          expr: up{component="ejbca"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: ca
+            team: pki-platform
+          annotations:
+            summary: "EJBCA CA instance {{ $labels.instance }} is down"
+            description: "The CA has been unreachable for >2m. Certificate issuance and CRL signing are impacted."
+            runbook: "https://wiki/runbooks/pki/ca-down"
+
+        - alert: OcspResponderDown
+          expr: probe_success{service="ocsp"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: ocsp
+            team: pki-platform
+          annotations:
+            summary: "OCSP responder probe failing ({{ $labels.instance }})"
+            description: "Revocation checking is unavailable. Relying parties may fail certificate validation."
+
+        - alert: OcspResponderSlow
+          expr: histogram_quantile(0.95, rate(probe_duration_seconds_bucket{service="ocsp"}[5m])) > 1.0
+          for: 10m
+          labels:
+            severity: warning
+            component: ocsp
+            team: pki-platform
+          annotations:
+            summary: "OCSP p95 latency > 1s for 10m"
+            description: "OCSP responses are degrading. Check CA database and responder cache."
+
+        - alert: CrlDistributionDown
+          expr: probe_success{service="crl"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: crl
+            team: pki-platform
+          annotations:
+            summary: "CRL distribution point unreachable"
+            description: "CRLs cannot be fetched by relying parties. Check CDP endpoint and CRL signing schedule."
+
+        - alert: CrlStale
+          expr: time() - pki_crl_last_update_timestamp_seconds > 86400
+          for: 1h
+          labels:
+            severity: warning
+            component: crl
+            team: pki-platform
+          annotations:
+            summary: "CRL has not been republished in >24h"
+            description: "The CRL is aging toward its nextUpdate. Verify the CRL signing cron/worker."
+
+    # ------------------------------------------------------------------
+    - name: pki.certificate-lifecycle
+      rules:
+        - alert: CertificateExpiringSoon
+          expr: |
+            (certmanager_certificate_expiration_timestamp_seconds - time()) < 7 * 24 * 3600
+            and on(namespace, name)
+            certmanager_certificate_ready_condition{condition="True"} == 1
+          for: 1h
+          labels:
+            severity: warning
+            component: cert-manager
+            team: pki-platform
+          annotations:
+            summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} expires in <7d"
+            description: "cert-manager certificate is approaching expiry and has not been renewed."
+
+        - alert: CertificateRenewalFailing
+          expr: certmanager_certificate_ready_condition{condition="True"} == 0
+          for: 30m
+          labels:
+            severity: warning
+            component: cert-manager
+            team: pki-platform
+          annotations:
+            summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} not Ready for 30m"
+            description: "Issuance or renewal is failing. Check cert-manager logs and issuer health."
+
+        - alert: CaCertificateExpiringSoon
+          expr: (pki_ca_certificate_not_after_timestamp_seconds - time()) < 90 * 24 * 3600
+          for: 1h
+          labels:
+            severity: info
+            component: ca
+            team: pki-platform
+          annotations:
+            summary: "CA certificate {{ $labels.ca_name }} expires in <90d"
+            description: "Begin CA rollover planning. See docs/cloud/certificate-lifecycle.md."
+
+        - alert: EnrollmentErrorRateHigh
+          expr: |
+            sum(rate(pki_enrollment_requests_total{result="error"}[15m])) by (protocol, customer)
+              /
+            clamp_min(sum(rate(pki_enrollment_requests_total[15m])) by (protocol, customer), 1)
+              > 0.10
+          for: 15m
+          labels:
+            severity: warning
+            component: enrollment
+            team: pki-platform
+          annotations:
+            summary: "Enrollment error rate >10% ({{ $labels.protocol }}, customer={{ $labels.customer }})"
+            description: "ACME/SCEP enrollment failures are elevated. Check worker logs and upstream CA."
+
+    # ------------------------------------------------------------------
+    - name: pki.queue-processing
+      rules:
+        - alert: RabbitMQQueueBacklog
+          expr: rabbitmq_queue_messages_ready{queue=~"cert-.*"} > 500
+          for: 15m
+          labels:
+            severity: warning
+            component: rabbitmq
+            team: pki-platform
+          annotations:
+            summary: "Queue {{ $labels.queue }} has >500 pending messages for 15m"
+            description: "cert-worker is not keeping up with enrollment/signing demand. Scale workers or check CA latency."
+
+        - alert: RabbitMQQueueNoConsumers
+          expr: rabbitmq_queue_consumers{queue=~"cert-.*"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: rabbitmq
+            team: pki-platform
+          annotations:
+            summary: "Queue {{ $labels.queue }} has zero consumers"
+            description: "No cert-worker is consuming. Certificate issuance pipeline is stalled."
+
+        - alert: RabbitMQNodeDown
+          expr: rabbitmq_up == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: rabbitmq
+            team: pki-platform
+          annotations:
+            summary: "RabbitMQ node down"
+            description: "Message broker unavailable; enrollment API will queue-fail."
+
+    # ------------------------------------------------------------------
+    - name: pki.workload-identity
+      rules:
+        - alert: SpireServerDown
+          expr: up{component="spire", app_kubernetes_io_name="spire-server"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: spiffe
+            team: pki-platform
+          annotations:
+            summary: "SPIRE server unreachable"
+            description: "Workload identity issuance (SVIDs) is failing cluster-wide."
+
+        - alert: SpireAgentUnavailable
+          expr: |
+            count(kube_pod_status_ready{namespace="spire", condition="true", pod=~"spire-agent-.*"})
+              <
+            count(kube_node_info)
+          for: 10m
+          labels:
+            severity: warning
+            component: spiffe
+            team: pki-platform
+          annotations:
+            summary: "SPIRE agent missing on one or more nodes"
+            description: "Some nodes cannot issue workload identities. Check DaemonSet rollout."
+
+        - alert: OpenBaoSealed
+          expr: vault_core_unsealed == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: secrets
+            team: pki-platform
+          annotations:
+            summary: "OpenBao is sealed"
+            description: "Secrets engine unavailable. PKI secrets, ACME account keys, and HSM PINs are inaccessible."
+
+    # ------------------------------------------------------------------
+    - name: pki.external-ca
+      rules:
+        - alert: ExternalCaGatewayDown
+          expr: probe_success{job=~"external-ca-.*"} == 0
+          for: 5m
+          labels:
+            severity: warning
+            component: external-ca
+            team: pki-platform
+          annotations:
+            summary: "External CA gateway probe failing: {{ $labels.instance }}"
+            description: "Integration with an external CA (DigiCert/Entrust/GlobalSign/etc.) is unreachable."
+
+        - alert: ExternalCaCertificateExpiring
+          expr: probe_ssl_earliest_cert_expiry{job=~"external-ca-.*"} - time() < 30 * 24 * 3600
+          for: 1h
+          labels:
+            severity: warning
+            component: external-ca
+            team: pki-platform
+          annotations:
+            summary: "External CA gateway TLS cert expires in <30d ({{ $labels.instance }})"
+            description: "Rotate the gateway client certificate before integration breaks."
+
+    # ------------------------------------------------------------------
+    - name: pki.platform-capacity
+      rules:
+        - alert: PrometheusStorageAlmostFull
+          expr: |
+            (kubelet_volume_stats_available_bytes{namespace="monitoring", persistentvolumeclaim=~"prometheus-.*"}
+              / kubelet_volume_stats_capacity_bytes) < 0.15
+          for: 1h
+          labels:
+            severity: warning
+            component: monitoring
+            team: pki-platform
+          annotations:
+            summary: "Prometheus TSDB volume <15% free"
+            description: "Increase retentionSize/storage or reduce retention before Prometheus stops ingesting."
+
+        - alert: PkiDatabaseDown
+          expr: up{component="database"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: database
+            team: pki-platform
+          annotations:
+            summary: "PKI PostgreSQL down"
+            description: "EJBCA cannot read/write CA state. All issuance stops."

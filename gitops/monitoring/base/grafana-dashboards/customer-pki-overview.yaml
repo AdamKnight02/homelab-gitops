@@ -1,0 +1,86 @@
+# Grafana dashboards as code.
+#
+# Each dashboard is a ConfigMap carrying:
+#   labels.grafana_dashboard: "1"        -> picked up by the Grafana sidecar
+#   annotations.grafana_folder: "..."    -> target folder in Grafana
+#
+# Dashboards are provisioned read-only from Git. UI edits are not persisted;
+# export changes back to Git via `grafana-dashboard` export or by editing
+# these files directly.
+#
+# UIDs are stable so links/alerts can reference them.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dash-customer-pki-overview
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: PKI Platform
+data:
+  customer-pki-overview.json: |
+    {
+      "uid": "pki-customer-overview",
+      "title": "Customer PKI Overview",
+      "tags": ["pki", "customer"],
+      "timezone": "browser",
+      "refresh": "30s",
+      "time": {"from": "now-24h", "to": "now"},
+      "templating": {
+        "list": [
+          {
+            "name": "customer",
+            "type": "query",
+            "datasource": "Prometheus",
+            "query": "label_values(pki_enrollment_requests_total, customer)",
+            "includeAll": true,
+            "multi": true,
+            "refresh": 2
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1, "type": "stat", "title": "Certificates Issued (24h)",
+          "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+          "targets": [{"expr": "sum(increase(pki_certificates_issued_total{customer=~\"$customer\"}[24h]))"}]
+        },
+        {
+          "id": 2, "type": "stat", "title": "Active Certificates",
+          "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
+          "targets": [{"expr": "sum(pki_certificates_active{customer=~\"$customer\"})"}]
+        },
+        {
+          "id": 3, "type": "stat", "title": "Expiring < 30d",
+          "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0},
+          "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 10}, {"color": "red", "value": 50}]}}},
+          "targets": [{"expr": "sum(pki_certificates_expiring_within_days{customer=~\"$customer\", days=\"30\"})"}]
+        },
+        {
+          "id": 4, "type": "stat", "title": "Enrollment Error Rate",
+          "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0},
+          "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.05}, {"color": "red", "value": 0.1}]}}},
+          "targets": [{"expr": "sum(rate(pki_enrollment_requests_total{customer=~\"$customer\", result=\"error\"}[1h])) / clamp_min(sum(rate(pki_enrollment_requests_total{customer=~\"$customer\"}[1h])), 1)"}]
+        },
+        {
+          "id": 5, "type": "timeseries", "title": "Issuance Rate by Protocol",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+          "fieldConfig": {"defaults": {"unit": "ops"}},
+          "targets": [{"expr": "sum(rate(pki_certificates_issued_total{customer=~\"$customer\"}[5m])) by (protocol)", "legendFormat": "{{ protocol }}"}]
+        },
+        {
+          "id": 6, "type": "timeseries", "title": "Enrollment Requests by Result",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+          "fieldConfig": {"defaults": {"unit": "ops", "custom": {"stacking": {"mode": "normal"}}}},
+          "targets": [{"expr": "sum(rate(pki_enrollment_requests_total{customer=~\"$customer\"}[5m])) by (result)", "legendFormat": "{{ result }}"}]
+        },
+        {
+          "id": 7, "type": "table", "title": "Certificates Expiring Soonest",
+          "gridPos": {"h": 9, "w": 24, "x": 0, "y": 14},
+          "targets": [{"expr": "bottomk(20, pki_certificate_not_after_timestamp_seconds{customer=~\"$customer\"} - time())", "format": "table", "instant": true}]
+        }
+      ],
+      "schemaVersion": 39,
+      "version": 1
+    }

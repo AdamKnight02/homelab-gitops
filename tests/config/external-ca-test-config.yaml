@@ -1,0 +1,382 @@
+# =============================================================================
+# External CA Test Configuration
+# =============================================================================
+# Configuration for external CA integration test scenarios.
+# Maps to the External CA Adapter Registry (docs/architecture/external-ca-adapter-registry.md)
+# =============================================================================
+
+version: "1.0"
+generated: "2026-09-12"
+
+# -----------------------------------------------------------------------------
+# Test Scenarios
+# -----------------------------------------------------------------------------
+scenarios:
+
+  # --- Baseline ---
+  - id: "EXTCA-NONE"
+    name: "No External CA (Internal Only)"
+    description: "Platform operates with internal CA only, no external integration"
+    provider: null
+    integration_type: none
+    expected_result: "PASS"
+    requires:
+      credentials: false
+      network: false
+      cluster: true
+    test_steps:
+      - "Verify EJBCA is running with internal CAs"
+      - "Verify no external CA configuration exists"
+      - "Verify certificate issuance works via internal CA"
+    status: "implemented"
+
+  # --- Let's Encrypt ---
+  - id: "EXTCA-LE-PROD"
+    name: "Let's Encrypt Production"
+    description: "ACME integration with Let's Encrypt production directory"
+    provider: letsencrypt
+    integration_type: acme
+    directory_url: "https://acme-v02.api.letsencrypt.org/directory"
+    expected_result: "BLOCKED"
+    requires:
+      credentials: false
+      network: true
+      cluster: true
+      public_dns: true
+    test_steps:
+      - "Configure ACME account with Let's Encrypt production"
+      - "Request certificate via HTTP-01 challenge"
+      - "Verify certificate issuance"
+      - "Verify certificate chain (ISRG Root X1)"
+      - "Test renewal"
+      - "Test revocation"
+    rate_limits:
+      certificates_per_domain_per_week: 50
+      duplicate_certificates_per_week: 5
+      failed_validations_per_account_per_hour: 5
+    notes: "Requires public DNS and HTTP-01/DNS-01 challenge capability"
+    status: "blocked"
+
+  - id: "EXTCA-LE-STAGING"
+    name: "Let's Encrypt Staging"
+    description: "ACME integration with Let's Encrypt staging directory"
+    provider: letsencrypt-staging
+    integration_type: acme
+    directory_url: "https://acme-staging-v02.api.letsencrypt.org/directory"
+    expected_result: "BLOCKED"
+    requires:
+      credentials: false
+      network: true
+      cluster: true
+      public_dns: false
+    test_steps:
+      - "Configure ACME account with Let's Encrypt staging"
+      - "Request certificate via HTTP-01 challenge"
+      - "Verify certificate issuance (fake certs)"
+      - "Test renewal"
+      - "Test revocation"
+    notes: "Safe for testing — no rate limits, issues fake certs"
+    status: "blocked"
+
+  # --- DigiCert ---
+  - id: "EXTCA-DIGICERT"
+    name: "DigiCert CertCentral"
+    description: "REST API integration with DigiCert CertCentral"
+    provider: digicert
+    integration_type: anyca
+    endpoint: "https://www.digicert.com/services/v2"
+    expected_result: "BLOCKED"
+    requires:
+      credentials: true
+      network: true
+      cluster: true
+    credential_refs:
+      api_key: "openbao:pki/digicert/api-key"
+      account_id: "openbao:pki/digicert/account-id"
+    test_steps:
+      - "Configure DigiCert API credentials"
+      - "Submit certificate request"
+      - "Verify request approval"
+      - "Retrieve issued certificate"
+      - "Verify certificate chain"
+      - "Test renewal"
+      - "Test revocation"
+      - "Test certificate discovery"
+      - "Test inventory sync"
+    capabilities:
+      issue: true
+      renew: true
+      revoke: true
+      discover: true
+      inventory: true
+    notes: "Requires DigiCert API key and account"
+    status: "blocked"
+
+  # --- Sectigo ---
+  - id: "EXTCA-SECTIGO"
+    name: "Sectigo"
+    description: "REST API integration with Sectigo"
+    provider: sectigo
+    integration_type: anyca
+    endpoint: "https://api.sectigo.com/v1"
+    expected_result: "BLOCKED"
+    requires:
+      credentials: true
+      network: true
+      cluster: true
+    credential_refs:
+      api_key: "openbao:pki/sectigo/api-key"
+      account_id: "openbao:pki/sectigo/account-id"
+    capabilities:
+      issue: true
+      renew: true
+      revoke: true
+      discover: true
+      inventory: true
+    notes: "Requires Sectigo API credentials"
+    status: "blocked"
+
+  # --- GlobalSign ---
+  - id: "EXTCA-GLOBALSIGN"
+    name: "GlobalSign"
+    description: "REST API integration with GlobalSign"
+    provider: globalsign
+    integration_type: anyca
+    endpoint: "https://api.globalsign.com/v1"
+    expected_result: "BLOCKED"
+    requires:
+      credentials: true
+      network: true
+      cluster: true
+    credential_refs:
+      api_key: "openbao:pki/globalsign/api-key"
+      account_id: "openbao:pki/globalsign/account-id"
+    capabilities:
+      issue: true
+      renew: true
+      revoke: true
+      discover: true
+      inventory: true
+    notes: "Requires GlobalSign API credentials"
+    status: "blocked"
+
+  # --- Entrust ---
+  - id: "EXTCA-ENTRUST"
+    name: "Entrust"
+    description: "REST API integration with Entrust"
+    provider: entrust
+    integration_type: anyca
+    endpoint: "https://api.entrust.com/v1"
+    expected_result: "BLOCKED"
+    requires:
+      credentials: true
+      network: true
+      cluster: true
+    credential_refs:
+      api_key: "openbao:pki/entrust/api-key"
+      account_id: "openbao:pki/entrust/account-id"
+    capabilities:
+      issue: true
+      renew: true
+      revoke: true
+      discover: true
+      inventory: true
+    notes: "Requires Entrust API credentials"
+    status: "blocked"
+
+  # --- GoDaddy ---
+  - id: "EXTCA-GODADDY"
+    name: "GoDaddy"
+    description: "Custom adapter for GoDaddy API"
+    provider: godaddy
+    integration_type: custom
+    endpoint: "https://api.godaddy.com/v1"
+    expected_result: "BLOCKED"
+    requires:
+      credentials: true
+      network: true
+      cluster: true
+    credential_refs:
+      api_key: "openbao:pki/godaddy/api-key"
+      api_secret: "openbao:pki/godaddy/api-secret"
+    capabilities:
+      issue: true
+      renew: true
+      revoke: true
+      discover: false
+      inventory: false
+    notes: "Requires custom adapter implementation"
+    status: "blocked"
+
+  # --- Custom CA ---
+  - id: "EXTCA-CUSTOM"
+    name: "Custom CA (EST/CMP)"
+    description: "Integration with custom CA via EST or CMP protocol"
+    provider: custom
+    integration_type: custom
+    expected_result: "BLOCKED"
+    requires:
+      credentials: true
+      network: true
+      cluster: true
+    credential_refs:
+      api_key: "openbao:pki/custom-ca/api-key"
+    capabilities:
+      issue: true
+      renew: true
+      revoke: true
+      discover: false
+      inventory: false
+    notes: "Requires custom CA endpoint and credentials"
+    status: "blocked"
+
+  # --- Lifecycle Scenarios ---
+  - id: "EXTCA-ADDON"
+    name: "Add-On CA (Post-Deploy)"
+    description: "Add external CA integration after initial deployment"
+    provider: addon
+    integration_type: lifecycle
+    expected_result: "BLOCKED"
+    requires:
+      credentials: true
+      network: true
+      cluster: true
+    test_steps:
+      - "Deploy platform with internal CA only"
+      - "Add external CA configuration"
+      - "Verify external CA is registered"
+      - "Issue certificate via external CA"
+      - "Verify internal CA still works"
+    notes: "Tests adding CA integration to running platform"
+    status: "blocked"
+
+  - id: "EXTCA-RERUN"
+    name: "Re-run External CA Setup"
+    description: "Re-run external CA configuration (idempotency)"
+    provider: rerun
+    integration_type: lifecycle
+    expected_result: "BLOCKED"
+    requires:
+      credentials: true
+      network: true
+      cluster: true
+    test_steps:
+      - "Configure external CA"
+      - "Re-run configuration with same parameters"
+      - "Verify no duplicate entries"
+      - "Verify configuration unchanged"
+    notes: "Verifies re-running CA setup is idempotent"
+    status: "blocked"
+
+  - id: "EXTCA-REMOVAL"
+    name: "Remove External CA"
+    description: "Remove external CA integration and verify cleanup"
+    provider: removal
+    integration_type: lifecycle
+    expected_result: "BLOCKED"
+    requires:
+      credentials: true
+      network: false
+      cluster: true
+    test_steps:
+      - "Configure external CA"
+      - "Remove external CA configuration"
+      - "Verify external CA is deregistered"
+      - "Verify internal CA still works"
+      - "Verify no orphaned certificates reference removed CA"
+    notes: "Tests clean removal of external CA configuration"
+    status: "blocked"
+
+  # --- Negative Test Scenarios ---
+  - id: "EXTCA-INVALID"
+    name: "Invalid Provider"
+    description: "Attempt to configure unsupported CA provider"
+    provider: invalid
+    integration_type: negative
+    expected_result: "FAIL"
+    requires:
+      credentials: false
+      network: false
+      cluster: false
+    test_steps:
+      - "Submit configuration with provider='nonexistent-ca'"
+      - "Verify validation rejects with clear error"
+    notes: "Should fail gracefully with clear error message"
+    status: "implemented"
+
+  - id: "EXTCA-NOCREDS"
+    name: "Missing Credentials"
+    description: "Attempt to configure external CA without credentials"
+    provider: missing-creds
+    integration_type: negative
+    expected_result: "FAIL"
+    requires:
+      credentials: false
+      network: false
+      cluster: false
+    test_steps:
+      - "Submit DigiCert configuration without api_key"
+      - "Verify validation rejects with credential error"
+    notes: "Should fail with clear credential error"
+    status: "implemented"
+
+  - id: "EXTCA-DUPGW"
+    name: "Duplicate Gateway"
+    description: "Attempt to configure duplicate CA gateway"
+    provider: duplicate
+    integration_type: negative
+    expected_result: "FAIL"
+    requires:
+      credentials: false
+      network: false
+      cluster: false
+    test_steps:
+      - "Configure external CA gateway 'primary'"
+      - "Attempt to configure second gateway with same name 'primary'"
+      - "Verify validation rejects duplicate"
+    notes: "Should detect and reject duplicate gateway configuration"
+    status: "implemented"
+
+# -----------------------------------------------------------------------------
+# Validation Status Summary
+# -----------------------------------------------------------------------------
+validation_status:
+  static_validation:
+    letsencrypt: true
+    digicert: true
+    sectigo: true
+    globalsign: true
+    entrust: true
+    godaddy: true
+    custom: true
+  plan_validation:
+    letsencrypt: false
+    digicert: false
+    sectigo: false
+    globalsign: false
+    entrust: false
+    godaddy: false
+    custom: false
+  live_validation:
+    letsencrypt: false
+    digicert: false
+    sectigo: false
+    globalsign: false
+    entrust: false
+    godaddy: false
+    custom: false
+
+# -----------------------------------------------------------------------------
+# Secret Store References
+# -----------------------------------------------------------------------------
+secret_stores:
+  openbao:
+    namespace: "openbao"
+    base_path: "pki"
+    access_method: "kubernetes-sa"
+  azure_key_vault:
+    access_method: "managed-identity"
+    notes: "For Azure deployments"
+  aws_secrets_manager:
+    access_method: "iam-role"
+    notes: "For AWS deployments"

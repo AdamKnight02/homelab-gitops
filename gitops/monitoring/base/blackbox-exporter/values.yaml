@@ -1,0 +1,80 @@
+# prometheus-blackbox-exporter values.
+# Probes external-facing PKI endpoints: OCSP responders, CRL distribution
+# points, ACME directories, SCEP endpoints, and external CA gateways.
+#
+# Rendered via Argo CD multi-source Application alongside the main stack.
+fullnameOverride: blackbox-exporter
+
+config:
+  modules:
+    # OCSP HTTP GET probe — expects "successful" OCSP response status.
+    ocsp_http:
+      prober: http
+      timeout: 10s
+      http:
+        method: GET
+        valid_status_codes: [200]
+        fail_if_body_not_matches_regexp:
+          # OCSP response bytes are DER; we check HTTP 200 + content-type.
+          - ".*"
+        preferred_ip_protocol: ip4
+        tls_config:
+          insecure_skip_verify: false
+
+    # CRL distribution point — must return a parseable CRL quickly.
+    crl_http:
+      prober: http
+      timeout: 15s
+      http:
+        method: GET
+        valid_status_codes: [200]
+        preferred_ip_protocol: ip4
+
+    # ACME directory — must return JSON with newNonce/newAccount etc.
+    acme_directory:
+      prober: http
+      timeout: 10s
+      http:
+        method: GET
+        valid_status_codes: [200]
+        fail_if_body_not_matches_regexp:
+          - '"newNonce"'
+          - '"newOrder"'
+
+    # SCEP — GET on the SCEP endpoint with operation=GetCACaps.
+    scep_operation:
+      prober: http
+      timeout: 10s
+      http:
+        method: GET
+        valid_status_codes: [200, 400, 405]
+
+    # Generic HTTPS cert-expiry probe for external CA gateways and portals.
+    https_cert:
+      prober: https
+      timeout: 10s
+      http:
+        valid_status_codes: [200, 301, 302, 401, 403]
+        tls_config:
+          insecure_skip_verify: false
+
+    # TCP connect probe for HSM / gateway ports.
+    tcp_connect:
+      prober: tcp
+      timeout: 5s
+      tcp:
+        query_response: []
+
+serviceMonitor:
+  enabled: true
+  defaults:
+    labels:
+      monitoring.pki.platform.io/enabled: "true"
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi

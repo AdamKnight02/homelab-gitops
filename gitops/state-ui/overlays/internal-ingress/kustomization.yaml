@@ -1,0 +1,26 @@
+# Internal exposure overlay — opt-in only.
+#
+# This overlay exposes state-ui on an INTERNAL ingress class behind the
+# platform SSO proxy (oauth2-proxy / Entra ID / OIDC). It is NOT applied by
+# default; the base is ClusterIP-only with no ingress.
+#
+# To enable: point the Argo CD application at overlays/internal-ingress and
+# set the host + SSO annotations for your environment.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: state-system
+
+resources:
+  - ../../base
+  - ingress.yaml
+
+patches:
+  # Allow ingress from the internal ingress namespace
+  - patch: |
+      - op: replace
+        path: /spec/ingress/0/from/0/namespaceSelector/matchLabels/kubernetes.io~1metadata.name
+        value: ingress-internal
+    target:
+      kind: NetworkPolicy
+      name: state-ui

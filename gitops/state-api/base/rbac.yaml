@@ -1,0 +1,27 @@
+# state-api needs TokenReview create (to authenticate callers) and nothing else.
+# It has NO access to secrets, NO access to state content in the cluster.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: state-api-auth
+  labels:
+    app.kubernetes.io/name: state-api
+rules:
+  - apiGroups: ["authentication.k8s.io"]
+    resources: ["tokenreviews"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: state-api-auth
+  labels:
+    app.kubernetes.io/name: state-api
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: state-api-auth
+subjects:
+  - kind: ServiceAccount
+    name: state-api
+    namespace: state-system

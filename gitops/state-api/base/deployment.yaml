@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: state-api
+  namespace: state-system
+  labels:
+    app.kubernetes.io/name: state-api
+    app.kubernetes.io/part-of: pki-platform
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: state-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: state-api
+        app.kubernetes.io/part-of: pki-platform
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /metrics
+    spec:
+      serviceAccountName: state-api
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: state-api
+      containers:
+        - name: state-api
+          image: registry.pki.platform.io/state-api:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: LOG_LEVEL
+              value: info
+            - name: STATE_REGISTRY_CONFIG
+              value: /etc/state-api/registry.yaml
+            - name: STATUS_CACHE_TTL
+              value: "60"
+            - name: METADATA_CACHE_TTL
+              value: "300"
+            - name: METRICS_REFRESH_INTERVAL
+              value: "60"
+            - name: STATE_UI_ORIGIN
+              value: http://state-ui.state-system.svc.cluster.local:8080
+            - name: OIDC_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: state-api-config
+                  key: oidc_issuer
+                  optional: true
+            - name: OIDC_AUDIENCE
+              value: state-api
+          volumeMounts:
+            - name: registry
+              mountPath: /etc/state-api
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            failureThreshold: 12
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: registry
+          configMap:
+            name: state-api-registry

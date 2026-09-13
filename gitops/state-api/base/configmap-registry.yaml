@@ -1,0 +1,111 @@
+# State registry — the ONLY states this API will serve.
+# Callers cannot address arbitrary backends; anything not listed here is 404.
+# Backend entries contain NON-SECRET coordinates only. Credentials come from
+# workload identity (IRSA / Azure Workload Identity / RRSA) at runtime.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: state-api-registry
+  namespace: state-system
+  labels:
+    app.kubernetes.io/name: state-api
+data:
+  registry.yaml: |
+    states:
+      # --- Lab environment (homelab default) ---
+      - provider: azure
+        customer: default
+        environment: lab
+        component: core
+        backend:
+          resource_group_name: pki-terraform-state-rg
+          storage_account_name: pkterraformstate
+          container_name: tfstate
+        pipeline:
+          url: ""
+          last_run_id: ""
+          last_run_status: ""
+          last_run_time: ""
+
+      - provider: azure
+        customer: default
+        environment: lab
+        component: addons
+        backend:
+          resource_group_name: pki-terraform-state-rg
+          storage_account_name: pkterraformstate
+          container_name: tfstate
+        pipeline: {}
+
+      - provider: azure
+        customer: default
+        environment: lab
+        component: monitoring
+        backend:
+          resource_group_name: pki-terraform-state-rg
+          storage_account_name: pkterraformstate
+          container_name: tfstate
+        pipeline: {}
+
+      - provider: aws
+        customer: default
+        environment: lab
+        component: core
+        backend:
+          bucket: pki-terraform-state-nonprod
+          region: us-east-1
+          dynamodb_table: terraform-state-locks
+          kms_key_id: alias/terraform-state-key
+        pipeline: {}
+
+      - provider: aws
+        customer: default
+        environment: lab
+        component: addons
+        backend:
+          bucket: pki-terraform-state-nonprod
+          region: us-east-1
+          dynamodb_table: terraform-state-locks
+          kms_key_id: alias/terraform-state-key
+        pipeline: {}
+
+      - provider: aws
+        customer: default
+        environment: lab
+        component: monitoring
+        backend:
+          bucket: pki-terraform-state-nonprod
+          region: us-east-1
+          dynamodb_table: terraform-state-locks
+          kms_key_id: alias/terraform-state-key
+        pipeline: {}
+
+      - provider: alibaba
+        customer: default
+        environment: lab
+        component: core
+        backend:
+          bucket: pki-terraform-state-nonprod
+          region: cn-hangzhou
+          tablestore_table: terraform-state-locks
+        pipeline: {}
+
+      - provider: alibaba
+        customer: default
+        environment: lab
+        component: addons
+        backend:
+          bucket: pki-terraform-state-nonprod
+          region: cn-hangzhou
+          tablestore_table: terraform-state-locks
+        pipeline: {}
+
+      - provider: alibaba
+        customer: default
+        environment: lab
+        component: monitoring
+        backend:
+          bucket: pki-terraform-state-nonprod
+          region: cn-hangzhou
+          tablestore_table: terraform-state-locks
+        pipeline: {}

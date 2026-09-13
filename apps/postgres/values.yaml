@@ -1,0 +1,17 @@
+architecture: standalone
+
+auth:
+  username: ejbca
+  database: ejbcadb
+
+  existingSecret: postgres-postgresql
+
+  secretKeys:
+    adminPasswordKey: postgres-password
+    userPasswordKey: password
+
+primary:
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: local-path

@@ -1,0 +1,65 @@
+# mTLS certificates for PKI service-to-service communication
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cert-api-tls
+  namespace: pki
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  secretName: cert-api-tls
+  issuerRef:
+    name: selfsigned-issuer
+    kind: ClusterIssuer
+  dnsNames:
+  - cert-api.pki.svc.cluster.local
+  - cert-api.pki.svc
+  - cert-api
+  usages:
+  - server auth
+  - client auth
+  duration: 2160h  # 90 days
+  renewBefore: 360h  # 15 days
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ca-service-tls
+  namespace: pki
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  secretName: ca-service-tls
+  issuerRef:
+    name: selfsigned-issuer
+    kind: ClusterIssuer
+  dnsNames:
+  - ca-service.pki.svc.cluster.local
+  - ca-service.pki.svc
+  - ca-service
+  usages:
+  - server auth
+  - client auth
+  duration: 2160h
+  renewBefore: 360h
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cert-worker-tls
+  namespace: pki
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  secretName: cert-worker-tls
+  issuerRef:
+    name: selfsigned-issuer
+    kind: ClusterIssuer
+  dnsNames:
+  - cert-worker.pki.svc.cluster.local
+  - cert-worker.pki.svc
+  - cert-worker
+  usages:
+  - client auth
+  duration: 2160h
+  renewBefore: 360h

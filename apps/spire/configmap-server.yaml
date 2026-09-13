@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spire-server
+  namespace: spire
+  labels:
+    app: spire-server
+data:
+  server.conf: |
+    server {
+      bind_address = "0.0.0.0"
+      bind_port = "8081"
+      trust_domain = "homelab.local"
+      data_dir = "/run/spire/data"
+      log_level = "DEBUG"
+      ca_key_type = "ec-p256"
+      
+      ca_subject = {
+        country = ["US"]
+        organization = ["Homelab"]
+        common_name = "homelab.local"
+      }
+    }
+
+    plugins {
+      DataStore "sql" {
+        plugin_data {
+          database_type = "sqlite3"
+          connection_string = "/run/spire/data/datastore.sqlite3"
+        }
+      }
+      
+      NodeAttestor "k8s_psat" {
+        plugin_data {
+          clusters = {
+            "k3s" = {
+              use_token_review_api_validation = true
+              service_account_allow_list = ["spire:spire-agent"]
+            }
+          }
+        }
+      }
+      
+      KeyManager "disk" {
+        plugin_data {
+          keys_path = "/run/spire/data/keys.json"
+        }
+      }
+      
+      Notifier "k8sbundle" {
+        plugin_data {
+          namespace = "spire"
+          config_map = "spire-bundle"
+          config_map_key = "bundle.crt"
+        }
+      }
+    }

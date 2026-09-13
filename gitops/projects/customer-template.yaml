@@ -1,0 +1,58 @@
+# Argo CD AppProject for Customer Isolation
+# Template for creating customer-specific projects
+
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: customer-template
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  description: "Customer workload isolation project"
+  
+  # Source repositories - customers can only deploy from their own path
+  sourceRepos:
+    - 'https://github.com/AdamKnight02/homelab-gitops.git'
+  
+  # Destinations - customers can only deploy to their own namespace
+  destinations:
+    - namespace: 'customer-*'
+      server: https://kubernetes.default.svc
+  
+  # Deny cluster-scoped resources
+  clusterResourceWhitelist: []
+  
+  # Namespace resource restrictions
+  namespaceResourceBlacklist:
+    - group: ''
+      kind: Secret
+    - group: ''
+      kind: ServiceAccount
+  
+  # RBAC roles for this project
+  roles:
+    - name: customer-admin
+      description: Customer administrator
+      policies:
+        - p, proj:customer-template:customer-admin, applications, get, customer-template/*, allow
+        - p, proj:customer-template:customer-admin, applications, sync, customer-template/*, allow
+        - p, proj:customer-template:customer-admin, applications, action/*, customer-template/*, allow
+        - p, proj:customer-template:customer-admin, applications, delete, customer-template/*, deny
+        - p, proj:customer-template:customer-admin, logs, get, customer-template/*, allow
+        - p, proj:customer-template:customer-admin, exec, create, customer-template/*, deny
+      groups: []
+  
+  # Sync windows - customer deployments only during business hours
+  syncWindows:
+    - kind: allow
+      schedule: '0 8-18 * * 1-5'
+      duration: 10h
+      applications:
+        - '*'
+      manualSync: true
+      timeZone: America/Chicago
+  
+  # Orphaned resources monitoring
+  orphanedResources:
+    warn: true

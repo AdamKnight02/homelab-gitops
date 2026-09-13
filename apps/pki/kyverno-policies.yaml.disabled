@@ -1,0 +1,92 @@
+# Kyverno policies for PKI security hardening
+# Note: Requires Kyverno to be installed
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-ro-rootfs
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  validationFailureAction: enforce
+  background: true
+  rules:
+  - name: check-read-only-root-fs
+    match:
+      resources:
+        kinds:
+        - Deployment
+        - StatefulSet
+        - DaemonSet
+        - Job
+        - CronJob
+        namespaces:
+        - pki
+    validate:
+      message: "Root filesystem must be read-only"
+      pattern:
+        spec:
+          template:
+            spec:
+              containers:
+              - securityContext:
+                  readOnlyRootFilesystem: true
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-non-root
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  validationFailureAction: enforce
+  background: true
+  rules:
+  - name: check-run-as-non-root
+    match:
+      resources:
+        kinds:
+        - Deployment
+        - StatefulSet
+        - DaemonSet
+        - Job
+        - CronJob
+        namespaces:
+        - pki
+    validate:
+      message: "Containers must run as non-root"
+      pattern:
+        spec:
+          template:
+            spec:
+              securityContext:
+                runAsNonRoot: true
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-image-registries
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  validationFailureAction: enforce
+  background: true
+  rules:
+  - name: validate-registries
+    match:
+      resources:
+        kinds:
+        - Deployment
+        - StatefulSet
+        - DaemonSet
+        - Job
+        - CronJob
+        namespaces:
+        - pki
+    validate:
+      message: "Only approved registries are allowed"
+      pattern:
+        spec:
+          template:
+            spec:
+              containers:
+              - image: "10.42.0.88:5000/* | docker.io/library/* | ghcr.io/*"

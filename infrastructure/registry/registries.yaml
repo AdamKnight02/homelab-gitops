@@ -1,0 +1,16 @@
+# K3s registry mirror configuration
+# Place at /etc/rancher/k3s/registries.yaml on each node
+mirrors:
+  "registry.registry.svc.cluster.local:5000":
+    endpoint:
+      - "http://registry.registry.svc.cluster.local:5000"
+  "localhost:5000":
+    endpoint:
+      - "http://registry.registry.svc.cluster.local:5000"
+configs:
+  "registry.registry.svc.cluster.local:5000":
+    tls:
+      insecure_skip_verify: true
+  "localhost:5000":
+    tls:
+      insecure_skip_verify: true

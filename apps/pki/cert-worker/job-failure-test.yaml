@@ -1,0 +1,156 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cert-failure-test
+  namespace: pki
+  labels:
+    app: cert-failure-test
+    app.kubernetes.io/part-of: machine-identity-platform
+    test-type: chaos
+spec:
+  template:
+    metadata:
+      labels:
+        app: cert-failure-test
+    spec:
+      serviceAccountName: cert-worker
+      restartPolicy: OnFailure
+      containers:
+      - name: failure-test
+        image: 10.42.0.88:5000/cert-worker:latest
+        imagePullPolicy: IfNotPresent
+        command: ["python", "-c"]
+        args:
+        - |
+          import os
+          import sys
+          import time
+          import httpx
+          import structlog
+          from datetime import datetime
+          
+          logger = structlog.get_logger()
+          
+          CERT_API_URL = os.getenv("CERT_API_URL", "http://cert-api:8000")
+          
+          def test_api_resilience():
+              """Test API resilience under load"""
+              logger.info("test.api_resilience.started")
+              
+              errors = 0
+              successes = 0
+              
+              # Rapid requests to test rate limiting
+              for i in range(50):
+                  try:
+                      resp = httpx.get(f"{CERT_API_URL}/health", timeout=5.0)
+                      if resp.status_code == 200:
+                          successes += 1
+                      else:
+                          errors += 1
+                  except Exception as e:
+                      errors += 1
+                  
+                  time.sleep(0.1)
+              
+              logger.info("test.api_resilience.completed",
+                        successes=successes,
+                        errors=errors)
+              
+              return errors < 10  # Allow some errors
+          
+          def test_database_failover():
+              """Test database connectivity"""
+              logger.info("test.database_failover.started")
+              
+              try:
+                  resp = httpx.get(f"{CERT_API_URL}/api/v1/stats", timeout=30.0)
+                  if resp.status_code == 200:
+                      logger.info("test.database_failover.ok")
+                      return True
+                  else:
+                      logger.error("test.database_failover.failed",
+                                 status=resp.status_code)
+                      return False
+              except Exception as e:
+                  logger.error("test.database_failover.error", error=str(e))
+                  return False
+          
+          def test_certificate_expiry_alert():
+              """Test that expiring certificates trigger alerts"""
+              logger.info("test.expiry_alert.started")
+              
+              try:
+                  resp = httpx.get(
+                      f"{CERT_API_URL}/api/v1/certificates/expiring",
+                      params={"days": 30},
+                      timeout=30.0
+                  )
+                  
+                  if resp.status_code == 200:
+                      data = resp.json()
+                      logger.info("test.expiry_alert.completed",
+                                count=data.get("count", 0))
+                      return True
+                  else:
+                      logger.error("test.expiry_alert.failed",
+                                 status=resp.status_code)
+                      return False
+              except Exception as e:
+                  logger.error("test.expiry_alert.error", error=str(e))
+                  return False
+          
+          def test_discovery_trigger():
+              """Test discovery job trigger"""
+              logger.info("test.discovery_trigger.started")
+              
+              try:
+                  resp = httpx.post(
+                      f"{CERT_API_URL}/api/v1/discovery/trigger",
+                      params={"source": "kubernetes_secret"},
+                      timeout=30.0
+                  )
+                  
+                  if resp.status_code == 200:
+                      logger.info("test.discovery_trigger.completed",
+                                job_id=resp.json().get("job_id"))
+                      return True
+                  else:
+                      logger.error("test.discovery_trigger.failed",
+                                 status=resp.status_code)
+                      return False
+              except Exception as e:
+                  logger.error("test.discovery_trigger.error", error=str(e))
+                  return False
+          
+          def run_all_tests():
+              logger.info("failure_tests.started")
+              
+              results = {
+                  "api_resilience": test_api_resilience(),
+                  "database_failover": test_database_failover(),
+                  "expiry_alert": test_certificate_expiry_alert(),
+                  "discovery_trigger": test_discovery_trigger(),
+              }
+              
+              passed = sum(1 for v in results.values() if v)
+              total = len(results)
+              
+              logger.info("failure_tests.completed",
+                        passed=passed,
+                        total=total,
+                        results=results)
+              
+              return 0 if passed == total else 1
+          
+          sys.exit(run_all_tests())
+        env:
+        - name: CERT_API_URL
+          value: "http://cert-api:8000"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi

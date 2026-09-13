@@ -1,0 +1,44 @@
+# Argo CD ApplicationSet for Customer Workloads
+# Automatically generates Applications for each customer in gitops/overlays/*/customers/
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: customer-workloads
+  namespace: argocd
+spec:
+  generators:
+    - git:
+        repoURL: https://github.com/AdamKnight02/homelab-gitops.git
+        revision: main
+        directories:
+          - path: gitops/overlays/*/customers/*
+  template:
+    metadata:
+      name: '{{path[2]}}-{{path[3]}}'
+      labels:
+        customer: '{{path[3]}}'
+        environment: '{{path[2]}}'
+    spec:
+      project: customer-{{path[3]}}
+      source:
+        repoURL: https://github.com/AdamKnight02/homelab-gitops.git
+        targetRevision: main
+        path: '{{path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: customer-{{path[3]}}
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - PruneLast=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+      revisionHistoryLimit: 10

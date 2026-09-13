@@ -1,0 +1,42 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: pki
+
+resources:
+  - namespace.yaml
+  - serviceaccount-cert-worker.yaml
+  - serviceaccount-cert-api.yaml
+  - serviceaccount-spire.yaml
+  # - networkpolicy-default-deny.yaml  # Disabled - blocks all traffic by default
+  - networkpolicy-cert-worker.yaml
+  - networkpolicy-cert-api.yaml
+  - database/deployment.yaml
+  - cert-api/deployment.yaml
+  - cert-api/deployment-spire.yaml
+  - cert-worker/deployment.yaml
+  - cert-worker/cronjob-renewal.yaml
+  - cert-worker/configmap-renewal.yaml
+  - cert-worker/cronjob-revocation-check.yaml
+  - cert-worker/configmap-policy.yaml
+  - cert-worker/cronjob-policy-check.yaml
+  - cert-worker/cronjob-pqc-scan.yaml
+  - cert-worker/configmap-pqc.yaml
+  - cert-worker/cronjob-backup.yaml
+  # - cert-worker/job-restore.yaml           # Disabled - run manually for DR only
+  # - cert-worker/job-failure-test.yaml      # Disabled - cert-api not fully deployed
+  # - cert-worker/cronjob-failure-test.yaml  # Disabled - cert-api not fully deployed
+  - pvc-backup.yaml
+  - cert-worker/cronjob-inventory.yaml
+  - cert-worker/configmap-inventory.yaml
+  # - cert-worker/job-discovery.yaml         # Disabled - run manually after cert-api is ready
+  - cert-worker/networkpolicy-discovery.yaml
+  - ca-service/deploy/deployment.yaml
+  - servicemonitor-cert-api.yaml
+  - servicemonitor-ca-service.yaml
+  # - prometheusrules-pki.yaml  # Disabled - requires custom metrics
+  - networkpolicy-mtls.yaml
+  - networkpolicy-hardened.yaml
+  - certificates-mtls.yaml
+  # - podsecuritypolicy.yaml  # Disabled - requires PSP admission controller
+  # - kyverno-policies.yaml   # Disabled - requires Kyverno installation

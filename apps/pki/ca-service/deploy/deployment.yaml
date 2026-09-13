@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ca-service
+  namespace: pki
+  labels:
+    app: ca-service
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ca-service
+  template:
+    metadata:
+      labels:
+        app: ca-service
+    spec:
+      serviceAccountName: cert-api
+      containers:
+      - name: ca-service
+        image: 10.43.164.190:5000/ca-service:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://certapi:certinventory-password-change-me@pki-database:5432/certapi"
+        - name: EJBCA_URL
+          value: "https://ejbca-ejbca-ce:8443/ejbca"
+        - name: OPENBAO_URL
+          value: "https://openbao:8200"
+        - name: PYTHONPATH
+          value: "/app/app"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ca-service
+  namespace: pki
+  labels:
+    app: ca-service
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+  selector:
+    app: ca-service

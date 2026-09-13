@@ -1,0 +1,122 @@
+# Example customer configuration for Contoso
+# This demonstrates a production deployment on Azure
+
+schema_version: 1
+
+customer:
+  id: contoso
+  name: Contoso Corporation
+  environment: prod
+  data_classification: confidential
+
+cloud:
+  provider: azure
+  region: eastus2
+  availability_zones: 3
+
+network:
+  cidr: 10.50.0.0/16
+  subnets:
+    management:
+      cidr: 10.50.0.0/24
+      access: private
+    pki:
+      cidr: 10.50.1.0/24
+      access: private
+    enrollment:
+      cidr: 10.50.2.0/24
+      access: public_gateway
+
+gateway:
+  enabled: true
+  count: 2
+  size_class: medium
+  public_access: true
+  tls_termination: true
+
+pki:
+  count: 2
+  size_class: large
+  ha_mode: active_passive
+  backup_enabled: true
+  hsm_type: cloud_hsm
+
+scep:
+  enabled: true
+  count: 4
+  size_class: medium
+  challenge_password_required: true
+
+acme:
+  enabled: true
+  count: 2
+  size_class: medium
+  directory_url: https://acme-v02.api.letsencrypt.org/directory
+  external_account_binding: false
+
+database:
+  engine: postgresql
+  size_class: medium
+  availability: highly_available
+  backup_retention_days: 35
+  encryption_at_rest: true
+
+storage:
+  class: standard
+  redundancy: regional
+  containers:
+    - name: crls
+      public_access: true
+      retention_days: 30
+    - name: backups
+      public_access: false
+      retention_days: 90
+    - name: logs
+      public_access: false
+      retention_days: 30
+
+secrets:
+  native_cloud_store: true
+  external_secrets_operator: true
+
+monitoring:
+  prometheus: true
+  grafana: true
+  alertmanager: true
+  log_retention_days: 30
+  metrics_retention_days: 90
+
+gitops:
+  enabled: true
+  repository: https://github.com/AdamKnight02/homelab-gitops
+  branch: customer/contoso
+  path: gitops/overlays/prod/customers/contoso
+
+features:
+  spire: true
+  openbao: true
+  rabbitmq: true
+  certificate_inventory: true
+  ocsp_responder: true
+  crl_distribution: true
+  scep_service: true
+  acme_service: true
+
+security:
+  pod_security_standard: restricted
+  network_policies: true
+  encryption_in_transit: true
+  encryption_at_rest: true
+
+cost_optimization:
+  auto_shutdown_dev: false
+  spot_instances: false
+  reserved_instances: true
+
+tags:
+  cost_center: it-security
+  owner: pki-team
+  project: customer-pki
+  compliance:
+    - soc2
+    - iso27001

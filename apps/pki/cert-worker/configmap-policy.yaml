@@ -1,0 +1,114 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cert-policy-engine
+  namespace: pki
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+data:
+  policies.yaml: |
+    policies:
+      - name: minimum-key-strength
+        description: "Enforce minimum key sizes"
+        enabled: true
+        severity: critical
+        rules:
+          - type: key_size
+            algorithms:
+              RSA:
+                minimum: 2048
+                recommended: 3072
+              ECDSA:
+                minimum: 256
+                recommended: 384
+              Ed25519:
+                minimum: 256
+                recommended: 256
+            action: reject
+      
+      - name: signature-algorithm-policy
+        description: "Block weak signature algorithms"
+        enabled: true
+        severity: critical
+        rules:
+          - type: signature_algorithm
+            blocked:
+              - md5WithRSAEncryption
+              - sha1WithRSAEncryption
+              - dsaWithSHA1
+            allowed:
+              - sha256WithRSAEncryption
+              - sha384WithRSAEncryption
+              - sha512WithRSAEncryption
+              - ecdsa-with-SHA256
+              - ecdsa-with-SHA384
+              - ecdsa-with-SHA512
+              - ed25519
+            action: reject
+      
+      - name: maximum-validity-period
+        description: "Limit certificate validity period"
+        enabled: true
+        severity: warning
+        rules:
+          - type: validity_period
+            maximum_days: 398  # CAB Forum baseline
+            recommended_days: 90
+            action: warn
+      
+      - name: required-subject-fields
+        description: "Require specific subject fields"
+        enabled: true
+        severity: warning
+        rules:
+          - type: subject_fields
+            required:
+              - CN
+              - O
+              - C
+            action: warn
+      
+      - name: san-requirement
+        description: "Require Subject Alternative Names"
+        enabled: true
+        severity: warning
+        rules:
+          - type: san_required
+            for_server_auth: true
+            action: warn
+      
+      - name: pqc-readiness
+        description: "Flag non-PQC-ready certificates"
+        enabled: true
+        severity: info
+        rules:
+          - type: pqc_readiness
+            minimum_rsa_size: 3072
+            minimum_ecdsa_size: 384
+            flag_vulnerable: true
+            action: flag
+      
+      - name: domain-validation
+        description: "Validate domain names"
+        enabled: true
+        severity: critical
+        rules:
+          - type: domain_validation
+            allowed_domains:
+              - "*.homelab.local"
+              - "*.svc.cluster.local"
+            blocked_domains:
+              - "*.com"
+              - "*.net"
+              - "*.org"
+            action: reject
+      
+      - name: certificate-transparency
+        description: "Require CT logging for public certificates"
+        enabled: false
+        severity: warning
+        rules:
+          - type: ct_logging
+            required: true
+            minimum_scts: 2
+            action: warn

@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ca-service
+  namespace: pki
+  labels:
+    app: ca-service
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  selector:
+    matchLabels:
+      app: ca-service
+  endpoints:
+  - port: "8000"
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+    - pki

@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cert-api
+  namespace: pki
+  labels:
+    app: cert-api
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cert-api
+  template:
+    metadata:
+      labels:
+        app: cert-api
+        app.kubernetes.io/part-of: machine-identity-platform
+    spec:
+      serviceAccountName: cert-api
+      containers:
+      - name: cert-api
+        image: 10.42.0.23:5000/cert-api:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://certapi:certinventory-password-change-me@pki-database:5432/certapi"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cert-api
+  namespace: pki
+  labels:
+    app: cert-api
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+  selector:
+    app: cert-api

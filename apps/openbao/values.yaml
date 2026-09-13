@@ -1,0 +1,82 @@
+# OpenBao Helm values
+# Chart: openbao/openbao 0.29.2
+# App version: v2.6.2
+
+# Single-node standalone for homelab
+global:
+  tlsDisable: false
+
+server:
+  enabled: true
+
+  # Resource constraints for homelab
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Data persistence with Raft
+  dataStorage:
+    enabled: true
+    size: 5Gi
+    storageClass: local-path
+    accessMode: ReadWriteOnce
+
+  # Audit log persistence
+  auditStorage:
+    enabled: true
+    size: 1Gi
+    storageClass: local-path
+    accessMode: ReadWriteOnce
+
+  # Service - ClusterIP for security
+  service:
+    enabled: true
+    type: ClusterIP
+
+  # Ingress disabled
+  ingress:
+    enabled: false
+
+  # Dev mode disabled
+  dev:
+    enabled: false
+
+  # Standalone mode
+  standalone:
+    enabled: true
+    config: |
+      ui = true
+      listener "tcp" {
+        tls_disable = 0
+        address = "[::]:8200"
+        cluster_address = "[::]:8201"
+        tls_cert_file = "/openbao/userconfig/server-tls/tls.crt"
+        tls_key_file  = "/openbao/userconfig/server-tls/tls.key"
+      }
+      storage "raft" {
+        path = "/openbao/data"
+      }
+      service_registration "kubernetes" {}
+
+  # Volumes for TLS certs
+  volumes:
+    - name: server-tls
+      secret:
+        secretName: openbao-server-tls
+
+  volumeMounts:
+    - name: server-tls
+      mountPath: /openbao/userconfig/server-tls
+      readOnly: true
+
+# Injector disabled
+injector:
+  enabled: false
+
+# UI enabled
+ui:
+  enabled: true

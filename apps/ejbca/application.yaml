@@ -1,0 +1,58 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+
+metadata:
+  name: ejbca
+  namespace: argocd
+
+spec:
+  project: default
+
+  sources:
+    - repoURL: oci://repo.keyfactor.com/charts/ejbca-ce
+      targetRevision: 9.3.7
+      path: .
+      helm:
+        releaseName: ejbca
+        valueFiles:
+          - $values/apps/ejbca/values.yaml
+
+    - repoURL: https://github.com/AdamKnight02/homelab-gitops.git
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ejbca
+
+  ignoreDifferences:
+    - group: ""
+      kind: ConfigMap
+      name: ejbca-ejbca-ce-nginx-config
+      namespace: ejbca
+      jqPathExpressions:
+        - .metadata.annotations."meta.helm.sh/release-name"
+        - .metadata.annotations."meta.helm.sh/release-namespace"
+        - .metadata.labels."app.kubernetes.io/managed-by"
+
+    - group: ""
+      kind: Service
+      name: ejbca-ejbca-ce-nginx
+      namespace: ejbca
+      jqPathExpressions:
+        - .metadata.annotations."meta.helm.sh/release-name"
+        - .metadata.annotations."meta.helm.sh/release-namespace"
+        - .metadata.labels."app.kubernetes.io/managed-by"
+        - .metadata.finalizers
+        - .spec.allocateLoadBalancerNodePorts
+        - .spec.clusterIP
+        - .spec.clusterIPs
+        - .spec.externalTrafficPolicy
+        - .spec.internalTrafficPolicy
+        - .spec.ipFamilies
+        - .spec.ipFamilyPolicy
+        - .spec.ports[].nodePort
+
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=false

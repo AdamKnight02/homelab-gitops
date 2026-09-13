@@ -1,0 +1,81 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cert-failure-test-scheduled
+  namespace: pki
+  labels:
+    app: cert-failure-test-scheduled
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  schedule: "0 5 * * 1"  # Weekly on Monday at 5 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      labels:
+        app: cert-failure-test-scheduled
+    spec:
+      template:
+        spec:
+          serviceAccountName: cert-worker
+          restartPolicy: OnFailure
+          containers:
+          - name: failure-test
+            image: 10.42.0.88:5000/cert-worker:latest
+            imagePullPolicy: IfNotPresent
+            command: ["python", "-c"]
+            args:
+            - |
+              import os
+              import sys
+              import httpx
+              import structlog
+              
+              logger = structlog.get_logger()
+              
+              CERT_API_URL = os.getenv("CERT_API_URL", "http://cert-api:8000")
+              
+              def run_scheduled_tests():
+                  logger.info("scheduled_tests.started")
+                  
+                  tests = [
+                      ("health_check", f"{CERT_API_URL}/health"),
+                      ("stats", f"{CERT_API_URL}/api/v1/stats"),
+                      ("expiring_certs", f"{CERT_API_URL}/api/v1/certificates/expiring?days=30"),
+                  ]
+                  
+                  passed = 0
+                  failed = 0
+                  
+                  for name, url in tests:
+                      try:
+                          resp = httpx.get(url, timeout=30.0)
+                          if resp.status_code == 200:
+                              passed += 1
+                              logger.info(f"test.{name}.passed")
+                          else:
+                              failed += 1
+                              logger.error(f"test.{name}.failed",
+                                         status=resp.status_code)
+                      except Exception as e:
+                          failed += 1
+                          logger.error(f"test.{name}.error", error=str(e))
+                  
+                  logger.info("scheduled_tests.completed",
+                            passed=passed,
+                            failed=failed)
+                  
+                  return 0 if failed == 0 else 1
+              
+              sys.exit(run_scheduled_tests())
+            env:
+            - name: CERT_API_URL
+              value: "http://cert-api:8000"
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 256Mi

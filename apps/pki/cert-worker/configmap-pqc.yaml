@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pqc-readiness-config
+  namespace: pki
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+data:
+  pqc-policy.yaml: |
+    # Post-Quantum Cryptography Readiness Policy
+    # Based on NIST SP 800-57 and NSA CNSA 2.0
+    
+    policy:
+      name: pqc-readiness
+      version: "1.0"
+      effective_date: "2026-01-01"
+      
+      # PQC Algorithm Recommendations
+      algorithms:
+        # Key Encapsulation Mechanisms (KEMs)
+        kem:
+          preferred:
+            - ML-KEM-1024
+            - ML-KEM-768
+          acceptable:
+            - ML-KEM-512
+          deprecated: []
+        
+        # Digital Signature Algorithms
+        signature:
+          preferred:
+            - ML-DSA-87
+            - ML-DSA-65
+          acceptable:
+            - ML-DSA-44
+            - SLH-DSA-SHA2-256s
+          deprecated: []
+        
+        # Classical algorithms with PQC minimums
+        classical:
+          RSA:
+            minimum_bits: 3072
+            recommended_bits: 4096
+            sunset_date: "2030-12-31"
+          
+          ECDSA:
+            minimum_curve: P-384
+            recommended_curve: P-521
+            sunset_date: "2030-12-31"
+          
+          Ed25519:
+            status: acceptable
+            sunset_date: "2035-12-31"
+      
+      # Migration timeline
+      migration:
+        phases:
+          - name: inventory
+            deadline: "2026-06-30"
+            description: "Complete inventory of all certificates"
+          
+          - name: hybrid
+            deadline: "2028-12-31"
+            description: "Deploy hybrid classical+PQC certificates"
+          
+          - name: pqc-only
+            deadline: "2030-12-31"
+            description: "Transition to PQC-only algorithms"
+      
+      # Compliance checking
+      compliance:
+        check_frequency: weekly
+        alert_on_vulnerable: true
+        alert_on_sunset_approach: true
+        sunset_warning_days: 365

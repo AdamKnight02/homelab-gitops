@@ -1,0 +1,25 @@
+# Argo CD Bootstrap Application
+# One-time manual application to bootstrap the entire GitOps system
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitops-bootstrap
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-system
+  source:
+    repoURL: https://github.com/AdamKnight02/homelab-gitops.git
+    targetRevision: main
+    path: gitops/bootstrap
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

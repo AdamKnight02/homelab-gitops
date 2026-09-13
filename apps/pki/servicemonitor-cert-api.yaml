@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cert-api
+  namespace: pki
+  labels:
+    app: cert-api
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  selector:
+    matchLabels:
+      app: cert-api
+  endpoints:
+  - port: "8000"
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+    - pki

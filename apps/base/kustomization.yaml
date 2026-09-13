@@ -1,0 +1,20 @@
+# Base Kustomization for Machine Identity Platform
+# Shared across all environments (homelab, azure, aws)
+# Individual app bases are referenced from their respective directories
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Common labels applied to all resources
+commonLabels:
+  app.kubernetes.io/part-of: machine-identity-platform
+  app.kubernetes.io/managed-by: argocd
+  platform.pki.io/base: "true"
+
+# Common annotations
+commonAnnotations:
+  platform.pki.io/docs: "https://github.com/AdamKnight02/homelab-gitops/tree/main/docs"
+  platform.pki.io/support: "GitOps managed - manual changes may be reverted"
+
+# Namespace transformer (can be overridden by overlays)
+namespace: pki

@@ -1,0 +1,90 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: crypto-inventory-scan
+  namespace: pki
+  labels:
+    app: crypto-inventory-scan
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      labels:
+        app: crypto-inventory-scan
+    spec:
+      template:
+        spec:
+          serviceAccountName: cert-worker
+          restartPolicy: OnFailure
+          containers:
+          - name: inventory-scan
+            image: 10.42.0.88:5000/cert-worker:latest
+            imagePullPolicy: IfNotPresent
+            command: ["python", "-c"]
+            args:
+            - |
+              import os
+              import sys
+              import httpx
+              import structlog
+              from datetime import datetime
+              
+              logger = structlog.get_logger()
+              
+              CERT_API_URL = os.getenv("CERT_API_URL", "http://cert-api:8000")
+              
+              def run_inventory_scan():
+                  try:
+                      logger.info("inventory.scan.started")
+                      
+                      # Trigger discovery from all sources
+                      sources = ["ejbca", "openbao_pki", "kubernetes_secret", "cert_manager"]
+                      
+                      for source in sources:
+                          try:
+                              resp = httpx.post(
+                                  f"{CERT_API_URL}/api/v1/discovery/trigger",
+                                  params={"source": source},
+                                  timeout=120.0
+                              )
+                              if resp.status_code == 200:
+                                  logger.info("inventory.source.scanned", 
+                                            source=source, 
+                                            job_id=resp.json().get("job_id"))
+                              else:
+                                  logger.warning("inventory.source.failed", 
+                                               source=source, 
+                                               status=resp.status_code)
+                          except Exception as e:
+                              logger.error("inventory.source.error", 
+                                         source=source, 
+                                         error=str(e))
+                      
+                      # Get statistics
+                      stats_resp = httpx.get(f"{CERT_API_URL}/api/v1/stats", timeout=30.0)
+                      if stats_resp.status_code == 200:
+                          stats = stats_resp.json()
+                          logger.info("inventory.stats", **stats)
+                      
+                      logger.info("inventory.scan.completed")
+                      return 0
+                      
+                  except Exception as e:
+                      logger.error("inventory.scan.failed", error=str(e))
+                      return 1
+              
+              sys.exit(run_inventory_scan())
+            env:
+            - name: CERT_API_URL
+              value: "http://cert-api:8000"
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 256Mi

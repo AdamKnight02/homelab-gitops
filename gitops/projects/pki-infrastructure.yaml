@@ -1,0 +1,48 @@
+# PKI Infrastructure Project
+# Shared PKI services (EJBCA, OpenBao, SPIRE, RabbitMQ)
+
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: pki-infrastructure
+  namespace: argocd
+spec:
+  description: "Shared PKI infrastructure services"
+  sourceRepos:
+    - 'https://github.com/AdamKnight02/homelab-gitops.git'
+    - 'https://helm.openbao.org'
+    - 'https://spiffe.github.io/helm-charts'
+    - 'https://charts.bitnami.com/bitnami'
+  destinations:
+    - namespace: 'pki-system'
+      server: https://kubernetes.default.svc
+    - namespace: 'spire'
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+    - group: 'rbac.authorization.k8s.io'
+      kind: ClusterRole
+    - group: 'rbac.authorization.k8s.io'
+      kind: ClusterRoleBinding
+  namespaceResourceBlacklist:
+    - group: ''
+      kind: Secret
+  roles:
+    - name: pki-admin
+      description: PKI administrator
+      policies:
+        - p, proj:pki-infrastructure:pki-admin, applications, get, pki-infrastructure/*, allow
+        - p, proj:pki-infrastructure:pki-admin, applications, sync, pki-infrastructure/*, allow
+        - p, proj:pki-infrastructure:pki-admin, applications, action/*, pki-infrastructure/*, allow
+      groups:
+        - pki-admins
+  # PKI components require manual sync for safety
+  syncWindows:
+    - kind: deny
+      schedule: '0 0-7 * * *'  # No auto-sync midnight-7am
+      duration: 7h
+      applications:
+        - 'ejbca'
+        - 'openbao'
+      manualSync: true

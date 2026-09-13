@@ -1,0 +1,99 @@
+# Hardened NetworkPolicy for PKI namespace
+# Default deny all, explicit allow only
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: pki
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+    policy-type: hardened
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+# Allow cert-api ingress from specific sources
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cert-api-ingress
+  namespace: pki
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  podSelector:
+    matchLabels:
+      app: cert-api
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8000
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: argocd
+    ports:
+    - protocol: TCP
+      port: 8000
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: machine-identity-platform
+    ports:
+    - protocol: TCP
+      port: 8000
+---
+# Allow database access only from PKI apps
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-database-ingress
+  namespace: pki
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  podSelector:
+    matchLabels:
+      app: pki-database
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: machine-identity-platform
+    ports:
+    - protocol: TCP
+      port: 5432
+---
+# Allow egress to DNS and required services
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: pki
+  labels:
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53

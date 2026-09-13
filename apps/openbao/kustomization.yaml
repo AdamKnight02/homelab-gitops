@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: openbao
+
+resources:
+  - networkpolicy-allow-pki.yaml
+  - resources/role-pki-workloads.yaml
+  - resources/kubernetes-auth-pki.yaml
+
+# Note: resources/policy-pki-workloads.hcl is an OpenBao policy file
+# It is applied via OpenBao CLI/API, not Kubernetes

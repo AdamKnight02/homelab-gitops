@@ -1,838 +1,895 @@
 # =============================================================================
-# Azure Deploy Add-On Infrastructure Pipeline
+# Azure Deploy Add-On Infrastructure Pipeline (GitHub Actions)
 # =============================================================================
 # Purpose: Add modular capabilities to an existing customer environment.
-# Trigger: Manual (with parameters)
+# Trigger: Manual (workflow_dispatch with inputs)
 # Cloud:   Azure
+#
+# Converted from: pipelines/azure/deploy-addon.yml (Azure DevOps format)
 # =============================================================================
 
-trigger: none
-
-parameters:
-  - name: customer_id
-    displayName: Customer ID
-    type: string
-    default: ''
-
-  - name: environment
-    displayName: Environment
-    type: string
-    values:
-      - lab
-      - dev
-      - staging
-      - production
-
-  - name: addon_type
-    displayName: Add-On Type
-    type: string
-    values:
-      - external_ca
-      - scep
-      - acme
-      - monitoring
-      - additional_gateway
-      - additional_worker
-
-  - name: external_ca_provider
-    displayName: External CA Provider
-    type: string
-    default: none
-    values:
-      - none
-      - letsencrypt
-      - digicert
-      - sectigo
-      - globalsign
-      - entrust
-      - godaddy
-      - custom
-
-  - name: deployment_profile
-    displayName: Deployment Profile
-    type: string
-    default: standard
-    values:
-      - economy
-      - standard
-      - enterprise
-
-  - name: operation
-    displayName: Operation
-    type: string
-    default: deploy
-    values:
-      - deploy
-      - plan
-      - remove
-
-variables:
-  - name: terraformWorkingDir
-    value: 'infra/terraform/azure'
-  - name: azureServiceConnection
-    value: 'azure-service-connection'
-  - name: stateKey
-    value: 'azure/${{ parameters.customer_id }}/${{ parameters.environment }}/addon-${{ parameters.addon_type }}'
-  - name: addonNamespace
-    value: 'pki'
-  - name: argoCdNamespace
-    value: 'argocd'
-
-stages:
-  # =========================================================================
-  # STAGE 1: VALIDATE
-  # =========================================================================
-  - stage: Validate
-    displayName: 'Validate'
-    jobs:
-      - job: LoadCurrentState
-        displayName: 'Load Current State'
-        steps:
-          - task: Bash@3
-            displayName: 'Verify Terraform state identity'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -euo pipefail
-                EXPECTED_STATE="azure/${{ parameters.customer_id }}/${{ parameters.environment }}/addon-${{ parameters.addon_type }}"
-                echo "Expected state key: ${EXPECTED_STATE}"
-                echo "State key variable: $(stateKey)"
-                if [ "${EXPECTED_STATE}" != "$(stateKey)" ]; then
-                  echo "ERROR: State identity mismatch!"
-                  exit 1
-                fi
-                echo "State identity verified."
-
-      - job: ValidateAddonRequest
-        displayName: 'Validate Add-On Request'
-        steps:
-          - task: Bash@3
-            displayName: 'Validate add-on parameters'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -euo pipefail
-                ADDON_TYPE="${{ parameters.addon_type }}"
-                EXTERNAL_CA_PROVIDER="${{ parameters.external_ca_provider }}"
-                OPERATION="${{ parameters.operation }}"
-
-                echo "Validating add-on request:"
-                echo "  Type: ${ADDON_TYPE}"
-                echo "  Provider: ${EXTERNAL_CA_PROVIDER}"
-                echo "  Operation: ${OPERATION}"
-
-                # Validate external_ca requires a provider
-                if [ "${ADDON_TYPE}" == "external_ca" ] && [ "${EXTERNAL_CA_PROVIDER}" == "none" ]; then
-                  echo "ERROR: addon_type=external_ca requires external_ca_provider to be set."
-                  exit 1
-                fi
-
-                # Validate non-external_ca addons do not specify a provider
-                if [ "${ADDON_TYPE}" != "external_ca" ] && [ "${EXTERNAL_CA_PROVIDER}" != "none" ]; then
-                  echo "WARNING: external_ca_provider is set but addon_type is not external_ca. Ignoring provider."
-                fi
-
-                echo "Add-on request validation passed."
-
-      - job: CheckAlreadyExists
-        displayName: 'Check if Already Exists'
-        steps:
-          - task: Bash@3
-            displayName: 'Idempotency check — duplicate detection'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -euo pipefail
-                ADDON_TYPE="${{ parameters.addon_type }}"
-                PROVIDER="${{ parameters.external_ca_provider }}"
-                NS="$(addonNamespace)"
-                ARGO_NS="$(argoCdNamespace)"
-
-                echo "Running duplicate detection for ${ADDON_TYPE}..."
-
-                # Check 1: Terraform state for existing add-on resources
-                echo "--- Check 1: Terraform state ---"
-                if terraform state list 2>/dev/null | grep -q "addon_${ADDON_TYPE}"; then
-                  echo "WARNING: Terraform state already contains addon_${ADDON_TYPE} resources."
-                  echo "This may be an idempotent re-run or a configuration update."
-                else
-                  echo "OK: No existing addon_${ADDON_TYPE} in Terraform state."
-                fi
-
-                # Check 2: Kubernetes pods
-                echo "--- Check 2: Kubernetes pods ---"
-                if kubectl get pods -n "${NS}" -l "app=${ADDON_TYPE}" 2>/dev/null | grep -q "${ADDON_TYPE}"; then
-                  echo "WARNING: Pods with label app=${ADDON_TYPE} already exist in namespace ${NS}."
-                else
-                  echo "OK: No existing pods for ${ADDON_TYPE}."
-                fi
-
-                # Check 3: Kubernetes services
-                echo "--- Check 3: Kubernetes services ---"
-                if kubectl get svc -n "${NS}" 2>/dev/null | grep -q "${ADDON_TYPE}"; then
-                  echo "WARNING: Service for ${ADDON_TYPE} already exists."
-                else
-                  echo "OK: No existing service for ${ADDON_TYPE}."
-                fi
-
-                # Check 4: Kubernetes secrets
-                echo "--- Check 4: Kubernetes secrets ---"
-                if kubectl get secrets -n "${NS}" 2>/dev/null | grep -q "${ADDON_TYPE}"; then
-                  echo "WARNING: Secrets for ${ADDON_TYPE} already exist."
-                else
-                  echo "OK: No existing secrets for ${ADDON_TYPE}."
-                fi
-
-                # Check 5: Argo CD applications
-                echo "--- Check 5: Argo CD applications ---"
-                if kubectl get applications -n "${ARGO_NS}" 2>/dev/null | grep -q "${ADDON_TYPE}"; then
-                  echo "WARNING: Argo CD application for ${ADDON_TYPE} already exists."
-                else
-                  echo "OK: No existing Argo CD application for ${ADDON_TYPE}."
-                fi
-
-                # Check 6: Namespace (for external_ca specifically)
-                if [ "${ADDON_TYPE}" == "external_ca" ]; then
-                  echo "--- Check 6: External CA namespace ---"
-                  if kubectl get ns 2>/dev/null | grep -q "external-ca"; then
-                    echo "WARNING: external-ca namespace already exists."
-                  else
-                    echo "OK: No external-ca namespace."
-                  fi
-                fi
-
-                echo "Duplicate detection complete."
-
-      - job: ValidateCredentials
-        displayName: 'Validate Credentials'
-        condition: eq('${{ parameters.addon_type }}', 'external_ca')
-        steps:
-          - task: Bash@3
-            displayName: 'Validate external CA credentials exist'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -euo pipefail
-                PROVIDER="${{ parameters.external_ca_provider }}"
-                echo "Validating credentials for external CA provider: ${PROVIDER}"
-
-                # Check Azure Key Vault for provider credentials
-                # Using managed identity — never print secrets
-                KV_NAME="pki-${CUSTOMER_ID}-${ENVIRONMENT}-kv"
-                SECRET_NAME="external-ca-${PROVIDER}-api-key"
-
-                echo "Checking Key Vault: ${KV_NAME} for secret: ${SECRET_NAME}"
-                if az keyvault secret show --vault-name "${KV_NAME}" --name "${SECRET_NAME}" --query "id" -o tsv 2>/dev/null; then
-                  echo "OK: Credentials exist for ${PROVIDER}."
-                else
-                  echo "ERROR: Credentials not found for ${PROVIDER} in Key Vault ${KV_NAME}."
-                  echo "Please provision the secret '${SECRET_NAME}' before deploying this add-on."
-                  exit 1
-                fi
-
-      - job: CostGuardrails
-        displayName: 'Cost Guardrails'
-        steps:
-          - task: Bash@3
-            displayName: 'Check cost guardrails'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -euo pipefail
-                PROFILE="${{ parameters.deployment_profile }}"
-                ADDON_TYPE="${{ parameters.addon_type }}"
-
-                echo "Checking cost guardrails for profile: ${PROFILE}, addon: ${ADDON_TYPE}"
-
-                # Define expected resource counts per profile
-                case "${PROFILE}" in
-                  economy)
-                    MAX_VMS=2
-                    MAX_PUBLIC_IPS=1
-                    MAX_LBS=0
-                    ;;
-                  standard)
-                    MAX_VMS=5
-                    MAX_PUBLIC_IPS=2
-                    MAX_LBS=2
-                    ;;
-                  enterprise)
-                    MAX_VMS=10
-                    MAX_PUBLIC_IPS=5
-                    MAX_LBS=3
-                    ;;
-                  *)
-                    echo "ERROR: Unknown deployment profile: ${PROFILE}"
-                    exit 1
-                    ;;
-                esac
-
-                # Count current resources
-                CURRENT_VMS=$(terraform state list 2>/dev/null | grep -c 'azurerm_linux_virtual_machine\|module.compute' || true)
-                CURRENT_PIPS=$(terraform state list 2>/dev/null | grep -c 'azurerm_public_ip' || true)
-                CURRENT_LBS=$(terraform state list 2>/dev/null | grep -c 'azurerm_lb\|module.load_balancer' || true)
-
-                echo "Current resources:"
-                echo "  VMs: ${CURRENT_VMS} (max: ${MAX_VMS})"
-                echo "  Public IPs: ${CURRENT_PIPS} (max: ${MAX_PUBLIC_IPS})"
-                echo "  Load Balancers: ${CURRENT_LBS} (max: ${MAX_LBS})"
-
-                # Hard stops
-                if [ "${CURRENT_VMS}" -ge "${MAX_VMS}" ]; then
-                  echo "ERROR: VM count at or above limit for ${PROFILE} profile."
-                  exit 1
-                fi
-
-                if [ "${CURRENT_PIPS}" -ge "${MAX_PUBLIC_IPS}" ]; then
-                  echo "ERROR: Public IP count at or above limit for ${PROFILE} profile."
-                  exit 1
-                fi
-
-                if [ "${CURRENT_LBS}" -ge "${MAX_LBS}" ] && [ "${MAX_LBS}" -eq 0 ]; then
-                  echo "ERROR: Load balancers not allowed in ${PROFILE} profile."
-                  exit 1
-                fi
-
-                echo "Cost guardrails passed."
-
-  # =========================================================================
-  # STAGE 2: PLAN
-  # =========================================================================
-  - stage: Plan
-    displayName: 'Plan'
-    dependsOn: Validate
-    jobs:
-      - job: TerraformPlan
-        displayName: 'Terraform Plan'
-        steps:
-          - task: TerraformInstaller@1
-            displayName: 'Install Terraform'
-            inputs:
-              terraformVersion: 'latest'
-
-          - task: TerraformTaskV4@4
-            displayName: 'Terraform Init'
-            inputs:
-              provider: 'azurerm'
-              command: 'init'
-              workingDirectory: '$(terraformWorkingDir)'
-              backendServiceArm: '$(azureServiceConnection)'
-              backendAzureRmResourceGroupName: 'pki-terraform-state'
-              backendAzureRmStorageAccountName: 'pkterraformstate'
-              backendAzureRmContainerName: 'tfstate'
-              backendAzureRmKey: '$(stateKey)'
-
-          - task: TerraformTaskV4@4
-            displayName: 'Terraform Plan'
-            inputs:
-              provider: 'azurerm'
-              command: 'plan'
-              workingDirectory: '$(terraformWorkingDir)'
-              environmentServiceNameAzureRM: '$(azureServiceConnection)'
-              commandOptions: |
-                -var="customer_id=${{ parameters.customer_id }}"
-                -var="environment=${{ parameters.environment }}"
-                -var="service_tier=${{ parameters.deployment_profile }}"
-                -var="addon_type=${{ parameters.addon_type }}"
-                -var="external_ca_provider=${{ parameters.external_ca_provider }}"
-                -var="operation=${{ parameters.operation }}"
-                -out=tfplan-addon
-
-      - job: ResourceCountCheck
-        displayName: 'Resource Count Check'
-        steps:
-          - task: Bash@3
-            displayName: 'Verify resource counts match expectations'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -euo pipefail
-                echo "Resource count check passed (validated via Terraform plan output)."
-                # In a full implementation, parse terraform show -json tfplan-addon
-                # and compare against expected counts per tier.
-
-      - job: CostEstimate
-        displayName: 'Cost Estimate'
-        steps:
-          - task: Bash@3
-            displayName: 'Generate cost estimate'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -euo pipefail
-                PROFILE="${{ parameters.deployment_profile }}"
-                echo "Estimated monthly cost for ${PROFILE} profile add-on:"
-                case "${PROFILE}" in
-                  economy)   echo "  ~$15-30 USD/month" ;;
-                  standard)  echo "  ~$50-120 USD/month" ;;
-                  enterprise) echo "  ~$150-400 USD/month" ;;
-                esac
-                echo "Cost estimate is approximate. Review Azure pricing calculator for exact figures."
-
-      - job: SecurityReview
-        displayName: 'Security Review'
-        steps:
-          - task: Bash@3
-            displayName: 'Security review checklist'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -euo pipefail
-                ADDON_TYPE="${{ parameters.addon_type }}"
-                echo "Security review for ${ADDON_TYPE}:"
-                echo "  [ ] No public inbound rules added"
-                echo "  [ ] Outbound restricted to port 443 (external CA only)"
-                echo "  [ ] Credentials stored in Key Vault, not in code"
-                echo "  [ ] Managed identity used for Azure resource access"
-                echo "  [ ] Network policies applied to Kubernetes pods"
-                echo "Security review checklist generated. Manual verification required."
-
-  # =========================================================================
-  # STAGE 3: APPROVAL
-  # =========================================================================
-  - stage: Approval
-    displayName: 'Approval'
-    dependsOn: Plan
-    jobs:
-      - job: ManualApproval
-        displayName: 'Manual Approval'
-        pool: server
-        steps:
-          - task: ManualValidation@0
-            displayName: 'Approve add-on deployment'
-            inputs:
-              notifyUsers: 'security-team@contoso.com'
-              instructions: |
-                Review the Terraform plan and security checklist for the following add-on deployment:
-
-                Customer: ${{ parameters.customer_id }}
-                Environment: ${{ parameters.environment }}
-                Add-On Type: ${{ parameters.addon_type }}
-                External CA Provider: ${{ parameters.external_ca_provider }}
-                Deployment Profile: ${{ parameters.deployment_profile }}
-                Operation: ${{ parameters.operation }}
-
-                Please verify:
-                1. The Terraform plan shows only expected changes
-                2. Cost estimate is within budget
-                3. Security checklist items are addressed
-                4. No duplicate resources will be created
-
-                Approve to proceed with deployment.
-
-      - job: CostApproval
-        displayName: 'Cost Approval'
-        pool: server
-        condition: in('${{ parameters.deployment_profile }}', 'standard', 'enterprise')
-        steps:
-          - task: ManualValidation@0
-            displayName: 'Approve cost'
-            inputs:
-              notifyUsers: 'finance-team@contoso.com'
-              instructions: |
-                Cost approval required for ${{ parameters.deployment_profile }} profile deployment.
-                Please review the cost estimate and approve.
-
-      - job: SecurityApproval
-        displayName: 'Security Approval'
-        pool: server
-        condition: eq('${{ parameters.addon_type }}', 'external_ca')
-        steps:
-          - task: ManualValidation@0
-            displayName: 'Approve security'
-            inputs:
-              notifyUsers: 'security-team@contoso.com'
-              instructions: |
-                Security approval required for external CA integration.
-                Please verify credentials, network policies, and compliance requirements.
-
-  # =========================================================================
-  # STAGE 4: DEPLOY ADD-ON
-  # =========================================================================
-  - stage: DeployAddon
-    displayName: 'Deploy Add-On'
-    dependsOn: Approval
-    condition: and(succeeded(), in('${{ parameters.operation }}', 'deploy', 'plan'))
-    jobs:
-      - job: TerraformApply
-        displayName: 'Terraform Apply'
-        steps:
-          - task: TerraformInstaller@1
-            displayName: 'Install Terraform'
-            inputs:
-              terraformVersion: 'latest'
-
-          - task: TerraformTaskV4@4
-            displayName: 'Terraform Init'
-            inputs:
-              provider: 'azurerm'
-              command: 'init'
-              workingDirectory: '$(terraformWorkingDir)'
-              backendServiceArm: '$(azureServiceConnection)'
-              backendAzureRmResourceGroupName: 'pki-terraform-state'
-              backendAzureRmStorageAccountName: 'pkterraformstate'
-              backendAzureRmContainerName: 'tfstate'
-              backendAzureRmKey: '$(stateKey)'
-
-          - task: TerraformTaskV4@4
-            displayName: 'Terraform Apply'
-            inputs:
-              provider: 'azurerm'
-              command: 'apply'
-              workingDirectory: '$(terraformWorkingDir)'
-              environmentServiceNameAzureRM: '$(azureServiceConnection)'
-              commandOptions: 'tfplan-addon'
-
-      - job: ArgoCDSync
-        displayName: 'Argo CD Sync'
-        steps:
-          - task: Bash@3
-            displayName: 'Sync Argo CD application'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -euo pipefail
-                ADDON_TYPE="${{ parameters.addon_type }}"
-                ARGO_NS="$(argoCdNamespace)"
-
-                echo "Syncing Argo CD application for ${ADDON_TYPE}..."
-
-                # Retry logic: if argocd CLI fails twice, fall back to kubectl
-                MAX_RETRIES=2
-                RETRY_COUNT=0
-                SYNC_SUCCESS=false
-
-                while [ ${RETRY_COUNT} -lt ${MAX_RETRIES} ] && [ "${SYNC_SUCCESS}" == "false" ]; do
-                  if argocd app sync "${ADDON_TYPE}" --namespace "${ARGO_NS}" 2>/dev/null; then
-                    SYNC_SUCCESS=true
-                    echo "Argo CD sync successful via argocd CLI."
-                  else
-                    RETRY_COUNT=$((RETRY_COUNT + 1))
-                    echo "argocd CLI attempt ${RETRY_COUNT} failed."
-                    sleep 5
-                  fi
-                done
-
-                if [ "${SYNC_SUCCESS}" == "false" ]; then
-                  echo "Falling back to kubectl for Argo CD sync..."
-                  kubectl patch application "${ADDON_TYPE}" -n "${ARGO_NS}" \
-                    --type merge \
-                    -p '{"operation":{"sync":{"revision":"HEAD"}}}' 2>/dev/null || {
-                    echo "ERROR: Both argocd CLI and kubectl fallback failed."
-                    exit 1
-                  }
-                  echo "Argo CD sync triggered via kubectl patch."
-                fi
-
-      - job: ConfigureAddon
-        displayName: 'Configure Add-On'
-        steps:
-          - task: Bash@3
-            displayName: 'Configure add-on specific settings'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -euo pipefail
-                ADDON_TYPE="${{ parameters.addon_type }}"
-                PROVIDER="${{ parameters.external_ca_provider }}"
-
-                echo "Configuring ${ADDON_TYPE}..."
-
-                case "${ADDON_TYPE}" in
-                  external_ca)
-                    echo "Configuring external CA gateway for provider: ${PROVIDER}"
-                    # Apply external CA specific ConfigMaps/Secrets
-                    kubectl apply -f "gitops/external-ca-gateway/${PROVIDER}/" -n pki 2>/dev/null || \
-                      echo "WARNING: No provider-specific config found for ${PROVIDER}"
-                    ;;
-                  scep)
-                    echo "Configuring SCEP protocol endpoint"
-                    kubectl apply -f gitops/scep/ -n pki 2>/dev/null || \
-                      echo "WARNING: No SCEP config found"
-                    ;;
-                  acme)
-                    echo "Configuring ACME protocol endpoint"
-                    kubectl apply -f gitops/acme/ -n pki 2>/dev/null || \
-                      echo "WARNING: No ACME config found"
-                    ;;
-                  monitoring)
-                    echo "Configuring monitoring stack"
-                    kubectl apply -f gitops/monitoring/ -n monitoring 2>/dev/null || \
-                      echo "WARNING: No monitoring config found"
-                    ;;
-                  additional_gateway)
-                    echo "Configuring additional gateway"
-                    kubectl apply -f gitops/gateway/ -n pki 2>/dev/null || \
-                      echo "WARNING: No gateway config found"
-                    ;;
-                  additional_worker)
-                    echo "Configuring additional worker"
-                    kubectl apply -f gitops/worker/ -n pki 2>/dev/null || \
-                      echo "WARNING: No worker config found"
-                    ;;
-                esac
-
-                echo "Add-on configuration applied."
-
-      - job: VerifyDeployment
-        displayName: 'Verify Deployment'
-        steps:
-          - task: Bash@3
-            displayName: 'Verify add-on deployment'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -euo pipefail
-                ADDON_TYPE="${{ parameters.addon_type }}"
-                NS="$(addonNamespace)"
-
-                echo "Verifying ${ADDON_TYPE} deployment..."
-
-                # Wait for pods to be ready
-                kubectl wait --for=condition=ready pod \
-                  -l "app=${ADDON_TYPE}" \
-                  -n "${NS}" \
-                  --timeout=300s 2>/dev/null || {
-                  echo "WARNING: Pods not ready within timeout. Checking status..."
-                  kubectl get pods -n "${NS}" -l "app=${ADDON_TYPE}"
-                }
-
-                # Check pod status
-                RUNNING_PODS=$(kubectl get pods -n "${NS}" -l "app=${ADDON_TYPE}" \
-                  --field-selector=status.phase=Running \
-                  -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | wc -w)
-
-                if [ "${RUNNING_PODS}" -gt 0 ]; then
-                  echo "OK: ${RUNNING_PODS} pod(s) running for ${ADDON_TYPE}."
-                else
-                  echo "ERROR: No running pods found for ${ADDON_TYPE}."
-                  exit 1
-                fi
-
-  # =========================================================================
-  # STAGE 5: SMOKE TESTS
-  # =========================================================================
-  - stage: SmokeTests
-    displayName: 'Smoke Tests'
-    dependsOn: DeployAddon
-    condition: and(succeeded(), eq('${{ parameters.operation }}', 'deploy'))
-    jobs:
-      - job: ConnectivityTests
-        displayName: 'Connectivity Tests'
-        steps:
-          - task: Bash@3
-            displayName: 'Test connectivity'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -euo pipefail
-                ADDON_TYPE="${{ parameters.addon_type }}"
-                NS="$(addonNamespace)"
-
-                echo "Running connectivity tests for ${ADDON_TYPE}..."
-
-                # Test 1: Pod-to-pod connectivity
-                POD_NAME=$(kubectl get pods -n "${NS}" -l "app=${ADDON_TYPE}" \
-                  -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-
-                if [ -n "${POD_NAME}" ]; then
-                  echo "Testing DNS resolution from pod ${POD_NAME}..."
-                  kubectl exec -n "${NS}" "${POD_NAME}" -- nslookup kubernetes.default 2>/dev/null || \
-                    echo "WARNING: DNS resolution test failed"
-
-                  echo "Testing outbound HTTPS from pod ${POD_NAME}..."
-                  kubectl exec -n "${NS}" "${POD_NAME}" -- curl -s -o /dev/null -w "%{http_code}" \
-                    --max-time 10 https://api.digicert.com 2>/dev/null || \
-                    echo "WARNING: Outbound HTTPS test failed"
-                else
-                  echo "WARNING: No pods found for connectivity testing."
-                fi
-
-                echo "Connectivity tests completed."
-
-      - job: AuthTests
-        displayName: 'Authentication Tests'
-        condition: eq('${{ parameters.addon_type }}', 'external_ca')
-        steps:
-          - task: Bash@3
-            displayName: 'Test authentication'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -euo pipefail
-                PROVIDER="${{ parameters.external_ca_provider }}"
-                NS="$(addonNamespace)"
-
-                echo "Running authentication tests for ${PROVIDER}..."
-
-                # Test credential validation without printing secrets
-                POD_NAME=$(kubectl get pods -n "${NS}" -l "app=external-ca-gateway" \
-                  -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-
-                if [ -n "${POD_NAME}" ]; then
-                  echo "Testing credential validation..."
-                  kubectl exec -n "${NS}" "${POD_NAME}" -- \
-                    /bin/sh -c 'test -n "$EXTERNAL_CA_API_KEY" && echo "OK" || echo "MISSING"' 2>/dev/null || \
-                    echo "WARNING: Credential validation test failed"
-                else
-                  echo "WARNING: No external CA gateway pods found."
-                fi
-
-                echo "Authentication tests completed."
-
-      - job: PKITests
-        displayName: 'PKI Tests'
-        steps:
-          - task: Bash@3
-            displayName: 'Test PKI operations'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -euo pipefail
-                ADDON_TYPE="${{ parameters.addon_type }}"
-                NS="$(addonNamespace)"
-
-                echo "Running PKI tests for ${ADDON_TYPE}..."
-
-                # Test certificate request via cert-api
-                echo "Testing certificate API availability..."
-                kubectl get svc -n "${NS}" cert-api 2>/dev/null && \
-                  echo "OK: cert-api service exists" || \
-                  echo "WARNING: cert-api service not found"
-
-                # Test CA abstraction layer
-                echo "Testing CA abstraction layer..."
-                kubectl get pods -n "${NS}" -l "app=ca-service" 2>/dev/null | grep -q Running && \
-                  echo "OK: ca-service is running" || \
-                  echo "WARNING: ca-service not running"
-
-                echo "PKI tests completed."
-
-      - job: IdempotencyTests
-        displayName: 'Idempotency Tests'
-        steps:
-          - task: Bash@3
-            displayName: 'Test idempotency'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -euo pipefail
-                ADDON_TYPE="${{ parameters.addon_type }}"
-
-                echo "Running idempotency tests for ${ADDON_TYPE}..."
-
-                # Re-run terraform plan to verify no changes
-                cd "$(terraformWorkingDir)"
-                terraform plan -detailed-exitcode \
-                  -var="customer_id=${{ parameters.customer_id }}" \
-                  -var="environment=${{ parameters.environment }}" \
-                  -var="service_tier=${{ parameters.deployment_profile }}" \
-                  -var="addon_type=${{ parameters.addon_type }}" \
-                  -var="external_ca_provider=${{ parameters.external_ca_provider }}" \
-                  2>&1 | tee /tmp/tfplan-idempotency.log
-
-                EXIT_CODE=$?
-                if [ ${EXIT_CODE} -eq 0 ]; then
-                  echo "OK: No changes detected. Deployment is idempotent."
-                elif [ ${EXIT_CODE} -eq 2 ]; then
-                  echo "WARNING: Changes detected on re-plan. Review /tmp/tfplan-idempotency.log"
-                else
-                  echo "ERROR: Terraform plan failed during idempotency test."
-                  exit 1
-                fi
-
-                echo "Idempotency tests completed."
-
-  # =========================================================================
-  # STAGE 6: REPORT
-  # =========================================================================
-  - stage: Report
-    displayName: 'Report'
-    dependsOn:
-      - DeployAddon
-      - SmokeTests
-    condition: always()
-    jobs:
-      - job: GenerateReport
-        displayName: 'Generate Report'
-        steps:
-          - task: Bash@3
-            displayName: 'Generate deployment report'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -euo pipefail
-
-                REPORT_FILE="deployment-report-${BUILD_BUILDID}.md"
-
-                cat > "${REPORT_FILE}" << 'EOF'
-                # Add-On Deployment Report
-
-                **Build ID:** ${BUILD_BUILDID}
-                **Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-
-                ## Parameters
-                | Parameter | Value |
-                |-----------|-------|
-                | Customer ID | ${{ parameters.customer_id }} |
-                | Environment | ${{ parameters.environment }} |
-                | Add-On Type | ${{ parameters.addon_type }} |
-                | External CA Provider | ${{ parameters.external_ca_provider }} |
-                | Deployment Profile | ${{ parameters.deployment_profile }} |
-                | Operation | ${{ parameters.operation }} |
-
-                ## Stage Results
-                | Stage | Status |
-                |-------|--------|
-                | Validate | $(Agent.JobStatus) |
-                | Plan | $(Agent.JobStatus) |
-                | Approval | $(Agent.JobStatus) |
-                | Deploy Add-On | $(Agent.JobStatus) |
-                | Smoke Tests | $(Agent.JobStatus) |
-
-                ## Notes
-                - Report generated automatically by Azure DevOps pipeline.
-                - Review individual stage logs for detailed output.
-                EOF
-
-                echo "Report generated: ${REPORT_FILE}"
-                cat "${REPORT_FILE}"
-
-          - task: PublishBuildArtifacts@1
-            displayName: 'Publish report artifact'
-            inputs:
-              PathtoPublish: 'deployment-report-${BUILD_BUILDID}.md'
-              ArtifactName: 'deployment-reports'
-
-      - job: PublishResults
-        displayName: 'Publish Results'
-        steps:
-          - task: Bash@3
-            displayName: 'Publish test results'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -euo pipefail
-                echo "Publishing results..."
-                echo "##vso[task.addattachment type=Distributedtask.Core.Summary;name=Add-On Deployment Summary;]deployment-report-${BUILD_BUILDID}.md"
-                echo "Results published."
-
-      - job: NotifyStakeholders
-        displayName: 'Notify Stakeholders'
-        steps:
-          - task: Bash@3
-            displayName: 'Send notifications'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -euo pipefail
-                echo "Notification placeholder:"
-                echo "  To: platform-team@contoso.com"
-                echo "  Subject: Add-On ${{ parameters.addon_type }} ${{ parameters.operation }} for ${{ parameters.customer_id }}/${{ parameters.environment }}"
-                echo "  Status: $(Agent.JobStatus)"
-                echo ""
-                echo "In production, integrate with:"
-                echo "  - Azure Logic Apps"
-                echo "  - Microsoft Teams webhook"
-                echo "  - Slack webhook"
-                echo "  - Email via SendGrid/Exchange"
+name: Azure Deploy Add-On
+
+on:
+  workflow_dispatch:
+    inputs:
+      customer_id:
+        description: 'Customer ID (e.g., contoso, fabrikam)'
+        required: true
+        type: string
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - lab
+          - dev
+          - staging
+          - production
+      addon_type:
+        description: 'Add-On Type'
+        required: true
+        type: choice
+        options:
+          - external_ca
+          - scep
+          - acme
+          - monitoring
+          - additional_gateway
+          - additional_worker
+      external_ca_provider:
+        description: 'External CA Provider (required if addon_type=external_ca)'
+        required: false
+        type: choice
+        default: none
+        options:
+          - none
+          - letsencrypt
+          - digicert
+          - sectigo
+          - globalsign
+          - entrust
+          - godaddy
+          - custom
+      deployment_profile:
+        description: 'Deployment Profile (affects resource limits and HA)'
+        required: false
+        type: choice
+        default: standard
+        options:
+          - economy
+          - standard
+          - enterprise
+      operation:
+        description: 'Operation to perform'
+        required: false
+        type: choice
+        default: deploy
+        options:
+          - deploy
+          - plan
+          - remove
+
+env:
+  TF_VERSION: '1.9.8'
+  TERRAFORM_WORKING_DIR: 'infra/terraform/azure'
+  ADDON_NAMESPACE: 'pki'
+  ARGOCD_NAMESPACE: 'argocd'
+
+permissions:
+  id-token: write
+  contents: read
+
+# =============================================================================
+# JOBS
+# =============================================================================
+jobs:
+  # ===========================================================================
+  # JOB 1: VALIDATE
+  # ===========================================================================
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    outputs:
+      state_key: ${{ steps.config.outputs.state_key }}
+      duplicate_detected: ${{ steps.duplicate.outputs.duplicate_detected }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set Configuration
+        id: config
+        run: |
+          STATE_KEY="azure/${{ inputs.customer_id }}/${{ inputs.environment }}/addon-${{ inputs.addon_type }}"
+          echo "state_key=${STATE_KEY}" >> $GITHUB_OUTPUT
+          echo "State Key: ${STATE_KEY}"
+
+      - name: Verify Terraform State Identity
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+        run: |
+          set -euo pipefail
+          EXPECTED_STATE="azure/${{ inputs.customer_id }}/${{ inputs.environment }}/addon-${{ inputs.addon_type }}"
+          echo "Expected state key: ${EXPECTED_STATE}"
+          echo "State key variable: ${{ steps.config.outputs.state_key }}"
+          if [ "${EXPECTED_STATE}" != "${{ steps.config.outputs.state_key }}" ]; then
+            echo "::error::State identity mismatch!"
+            exit 1
+          fi
+          echo "✅ State identity verified."
+
+      - name: Validate Add-On Request
+        run: |
+          set -euo pipefail
+          ADDON_TYPE="${{ inputs.addon_type }}"
+          EXTERNAL_CA_PROVIDER="${{ inputs.external_ca_provider }}"
+          OPERATION="${{ inputs.operation }}"
+
+          echo "Validating add-on request:"
+          echo "  Type: ${ADDON_TYPE}"
+          echo "  Provider: ${EXTERNAL_CA_PROVIDER}"
+          echo "  Operation: ${OPERATION}"
+
+          # Validate external_ca requires a provider
+          if [ "${ADDON_TYPE}" == "external_ca" ] && [ "${EXTERNAL_CA_PROVIDER}" == "none" ]; then
+            echo "::error::addon_type=external_ca requires external_ca_provider to be set."
+            exit 1
+          fi
+
+          # Validate non-external_ca addons do not specify a provider
+          if [ "${ADDON_TYPE}" != "external_ca" ] && [ "${EXTERNAL_CA_PROVIDER}" != "none" ]; then
+            echo "::warning::external_ca_provider is set but addon_type is not external_ca. Ignoring provider."
+          fi
+
+          echo "✅ Add-on request validation passed."
+
+      - name: Check if Already Exists (Idempotency)
+        id: duplicate
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+        run: |
+          set -euo pipefail
+          ADDON_TYPE="${{ inputs.addon_type }}"
+          PROVIDER="${{ inputs.external_ca_provider }}"
+          NS="${{ env.ADDON_NAMESPACE }}"
+          ARGO_NS="${{ env.ARGOCD_NAMESPACE }}"
+
+          echo "Running duplicate detection for ${ADDON_TYPE}..."
+          DUPLICATE_FOUND="false"
+
+          # Initialize Terraform to check state
+          terraform init -backend=false -input=false > /dev/null 2>&1 || true
+
+          # Check 1: Terraform state for existing add-on resources
+          echo "--- Check 1: Terraform state ---"
+          if terraform state list 2>/dev/null | grep -q "addon_${ADDON_TYPE}"; then
+            echo "::warning::Terraform state already contains addon_${ADDON_TYPE} resources."
+            echo "This may be an idempotent re-run or a configuration update."
+            DUPLICATE_FOUND="true"
+          else
+            echo "OK: No existing addon_${ADDON_TYPE} in Terraform state."
+          fi
+
+          # Check 2: Kubernetes pods
+          echo "--- Check 2: Kubernetes pods ---"
+          if kubectl get pods -n "${NS}" -l "app=${ADDON_TYPE}" 2>/dev/null | grep -q "${ADDON_TYPE}"; then
+            echo "::warning::Pods with label app=${ADDON_TYPE} already exist in namespace ${NS}."
+            DUPLICATE_FOUND="true"
+          else
+            echo "OK: No existing pods for ${ADDON_TYPE}."
+          fi
+
+          # Check 3: Kubernetes services
+          echo "--- Check 3: Kubernetes services ---"
+          if kubectl get svc -n "${NS}" 2>/dev/null | grep -q "${ADDON_TYPE}"; then
+            echo "::warning::Service for ${ADDON_TYPE} already exists."
+            DUPLICATE_FOUND="true"
+          else
+            echo "OK: No existing service for ${ADDON_TYPE}."
+          fi
+
+          # Check 4: Kubernetes secrets
+          echo "--- Check 4: Kubernetes secrets ---"
+          if kubectl get secrets -n "${NS}" 2>/dev/null | grep -q "${ADDON_TYPE}"; then
+            echo "::warning::Secrets for ${ADDON_TYPE} already exist."
+            DUPLICATE_FOUND="true"
+          else
+            echo "OK: No existing secrets for ${ADDON_TYPE}."
+          fi
+
+          # Check 5: Argo CD applications
+          echo "--- Check 5: Argo CD applications ---"
+          if kubectl get applications -n "${ARGO_NS}" 2>/dev/null | grep -q "${ADDON_TYPE}"; then
+            echo "::warning::Argo CD application for ${ADDON_TYPE} already exists."
+            DUPLICATE_FOUND="true"
+          else
+            echo "OK: No existing Argo CD application for ${ADDON_TYPE}."
+          fi
+
+          # Check 6: Namespace (for external_ca specifically)
+          if [ "${ADDON_TYPE}" == "external_ca" ]; then
+            echo "--- Check 6: External CA namespace ---"
+            if kubectl get ns 2>/dev/null | grep -q "external-ca"; then
+              echo "::warning::external-ca namespace already exists."
+              DUPLICATE_FOUND="true"
+            else
+              echo "OK: No external-ca namespace."
+            fi
+          fi
+
+          echo "duplicate_detected=${DUPLICATE_FOUND}" >> $GITHUB_OUTPUT
+          echo "Duplicate detection complete."
+
+      - name: Validate External CA Credentials
+        if: inputs.addon_type == 'external_ca'
+        run: |
+          set -euo pipefail
+          PROVIDER="${{ inputs.external_ca_provider }}"
+          CUSTOMER_ID="${{ inputs.customer_id }}"
+          ENVIRONMENT="${{ inputs.environment }}"
+
+          echo "Validating credentials for external CA provider: ${PROVIDER}"
+
+          # Check Azure Key Vault for provider credentials
+          # Using managed identity — never print secrets
+          KV_NAME="pki-${CUSTOMER_ID}-${ENVIRONMENT}-kv"
+          SECRET_NAME="external-ca-${PROVIDER}-api-key"
+
+          echo "Checking Key Vault: ${KV_NAME} for secret: ${SECRET_NAME}"
+          if az keyvault secret show --vault-name "${KV_NAME}" --name "${SECRET_NAME}" --query "id" -o tsv 2>/dev/null; then
+            echo "✅ Credentials exist for ${PROVIDER}."
+          else
+            echo "::error::Credentials not found for ${PROVIDER} in Key Vault ${KV_NAME}."
+            echo "Please provision the secret '${SECRET_NAME}' before deploying this add-on."
+            exit 1
+          fi
+
+      - name: Cost Guardrails
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+        run: |
+          set -euo pipefail
+          PROFILE="${{ inputs.deployment_profile }}"
+          ADDON_TYPE="${{ inputs.addon_type }}"
+
+          echo "Checking cost guardrails for profile: ${PROFILE}, addon: ${ADDON_TYPE}"
+
+          # Define expected resource counts per profile
+          case "${PROFILE}" in
+            economy)
+              MAX_VMS=2
+              MAX_PUBLIC_IPS=1
+              MAX_LBS=0
+              ;;
+            standard)
+              MAX_VMS=5
+              MAX_PUBLIC_IPS=2
+              MAX_LBS=2
+              ;;
+            enterprise)
+              MAX_VMS=10
+              MAX_PUBLIC_IPS=5
+              MAX_LBS=3
+              ;;
+            *)
+              echo "::error::Unknown deployment profile: ${PROFILE}"
+              exit 1
+              ;;
+          esac
+
+          # Count current resources
+          CURRENT_VMS=$(terraform state list 2>/dev/null | grep -c 'azurerm_linux_virtual_machine\|module.compute' || echo "0")
+          CURRENT_PIPS=$(terraform state list 2>/dev/null | grep -c 'azurerm_public_ip' || echo "0")
+          CURRENT_LBS=$(terraform state list 2>/dev/null | grep -c 'azurerm_lb\|module.load_balancer' || echo "0")
+
+          echo "Current resources:"
+          echo "  VMs: ${CURRENT_VMS} (max: ${MAX_VMS})"
+          echo "  Public IPs: ${CURRENT_PIPS} (max: ${MAX_PUBLIC_IPS})"
+          echo "  Load Balancers: ${CURRENT_LBS} (max: ${MAX_LBS})"
+
+          # Hard stops
+          if [ "${CURRENT_VMS}" -ge "${MAX_VMS}" ]; then
+            echo "::error::VM count at or above limit for ${PROFILE} profile."
+            exit 1
+          fi
+
+          if [ "${CURRENT_PIPS}" -ge "${MAX_PUBLIC_IPS}" ]; then
+            echo "::error::Public IP count at or above limit for ${PROFILE} profile."
+            exit 1
+          fi
+
+          if [ "${CURRENT_LBS}" -ge "${MAX_LBS}" ] && [ "${MAX_LBS}" -eq 0 ]; then
+            echo "::error::Load balancers not allowed in ${PROFILE} profile."
+            exit 1
+          fi
+
+          echo "✅ Cost guardrails passed."
+
+  # ===========================================================================
+  # JOB 2: PLAN
+  # ===========================================================================
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    needs: validate
+    outputs:
+      plan_exitcode: ${{ steps.tfplan.outputs.exitcode }}
+      has_changes: ${{ steps.tfplan.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: true
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=pki-terraform-state" \
+            -backend-config="storage_account_name=pkterraformstate" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=${{ needs.validate.outputs.state_key }}" \
+            -input=false
+
+      - name: Terraform Plan
+        id: tfplan
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+        run: |
+          set -euo pipefail
+
+          terraform plan \
+            -input=false \
+            -no-color \
+            -detailed-exitcode \
+            -out=tfplan-addon \
+            -var="customer_id=${{ inputs.customer_id }}" \
+            -var="environment=${{ inputs.environment }}" \
+            -var="service_tier=${{ inputs.deployment_profile }}" \
+            -var="addon_type=${{ inputs.addon_type }}" \
+            -var="external_ca_provider=${{ inputs.external_ca_provider }}" \
+            -var="operation=${{ inputs.operation }}" \
+            2>&1 | tee plan_output.txt
+
+          EXITCODE=${PIPESTATUS[0]}
+          echo "exitcode=${EXITCODE}" >> $GITHUB_OUTPUT
+
+          if [ "${EXITCODE}" -eq 2 ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "::notice::Terraform plan detected changes."
+          elif [ "${EXITCODE}" -eq 0 ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "::notice::Terraform plan: no changes detected."
+          else
+            echo "::error::Terraform plan failed with exit code ${EXITCODE}"
+            exit 1
+          fi
+
+      - name: Upload Plan Output
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: |
+            ${{ env.TERRAFORM_WORKING_DIR }}/tfplan-addon
+            ${{ env.TERRAFORM_WORKING_DIR }}/plan_output.txt
+          retention-days: 7
+
+      - name: Resource Count Check
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+        run: |
+          set -euo pipefail
+          echo "Resource count check passed (validated via Terraform plan output)."
+          # In a full implementation, parse terraform show -json tfplan-addon
+          # and compare against expected counts per tier.
+
+      - name: Cost Estimate
+        run: |
+          set -euo pipefail
+          PROFILE="${{ inputs.deployment_profile }}"
+          echo "Estimated monthly cost for ${PROFILE} profile add-on:"
+          case "${PROFILE}" in
+            economy)   echo "  ~\$15-30 USD/month" ;;
+            standard)  echo "  ~\$50-120 USD/month" ;;
+            enterprise) echo "  ~\$150-400 USD/month" ;;
+          esac
+          echo "Cost estimate is approximate. Review Azure pricing calculator for exact figures."
+
+      - name: Security Review Checklist
+        run: |
+          set -euo pipefail
+          ADDON_TYPE="${{ inputs.addon_type }}"
+          echo "Security review for ${ADDON_TYPE}:"
+          echo "  [ ] No public inbound rules added"
+          echo "  [ ] Outbound restricted to port 443 (external CA only)"
+          echo "  [ ] Credentials stored in Key Vault, not in code"
+          echo "  [ ] Managed identity used for Azure resource access"
+          echo "  [ ] Network policies applied to Kubernetes pods"
+          echo ""
+          echo "::notice::Security review checklist generated. Manual verification required."
+
+  # ===========================================================================
+  # JOB 3: APPROVAL
+  # ===========================================================================
+  approval:
+    name: Approval
+    runs-on: ubuntu-latest
+    needs: plan
+    environment:
+      name: ${{ inputs.environment }}
+    steps:
+      - name: Manual Approval Checkpoint
+        run: |
+          echo "============================================================================="
+          echo "MANUAL APPROVAL REQUIRED"
+          echo "============================================================================="
+          echo ""
+          echo "Review the Terraform plan and security checklist for the following add-on deployment:"
+          echo ""
+          echo "  Customer:            ${{ inputs.customer_id }}"
+          echo "  Environment:         ${{ inputs.environment }}"
+          echo "  Add-On Type:         ${{ inputs.addon_type }}"
+          echo "  External CA Provider: ${{ inputs.external_ca_provider }}"
+          echo "  Deployment Profile:  ${{ inputs.deployment_profile }}"
+          echo "  Operation:           ${{ inputs.operation }}"
+          echo ""
+          echo "Please verify:"
+          echo "  1. The Terraform plan shows only expected changes"
+          echo "  2. Cost estimate is within budget"
+          echo "  3. Security checklist items are addressed"
+          echo "  4. No duplicate resources will be created"
+          echo ""
+          echo "============================================================================="
+          echo "This job requires manual approval via GitHub Environments protection rules."
+          echo "Configure required reviewers in: Settings → Environments → ${{ inputs.environment }}"
+          echo "============================================================================="
+
+      - name: Cost Approval Notice
+        if: contains(fromJSON('["standard", "enterprise"]'), inputs.deployment_profile)
+        run: |
+          echo "::notice::Cost approval required for ${{ inputs.deployment_profile }} profile deployment."
+          echo "::notice::Please ensure finance team has reviewed the cost estimate."
+
+      - name: Security Approval Notice
+        if: inputs.addon_type == 'external_ca'
+        run: |
+          echo "::notice::Security approval required for external CA integration."
+          echo "::notice::Please verify credentials, network policies, and compliance requirements."
+
+  # ===========================================================================
+  # JOB 4: DEPLOY ADD-ON
+  # ===========================================================================
+  deploy-addon:
+    name: Deploy Add-On
+    runs-on: ubuntu-latest
+    needs: approval
+    if: contains(fromJSON('["deploy", "plan"]'), inputs.operation)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: true
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Download Plan Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan
+          path: ${{ env.TERRAFORM_WORKING_DIR }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=pki-terraform-state" \
+            -backend-config="storage_account_name=pkterraformstate" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=${{ needs.validate.outputs.state_key }}" \
+            -input=false
+
+      - name: Terraform Apply
+        working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
+        run: |
+          set -euo pipefail
+          terraform apply -input=false -auto-approve tfplan-addon
+          echo "✅ Terraform apply completed."
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.31.0'
+
+      - name: Setup kubelogin
+        uses: azure/use-kubelogin@v1
+        with:
+          kubelogin-version: 'v0.1.4'
+
+      - name: Get AKS Credentials
+        run: |
+          set -euo pipefail
+          AKS_NAME="pki-${{ inputs.customer_id }}-${{ inputs.environment }}-aks"
+          AKS_RG="pki-${{ inputs.customer_id }}-${{ inputs.environment }}-rg"
+
+          echo "Getting credentials for AKS cluster: ${AKS_NAME}"
+          az aks get-credentials \
+            --resource-group "${AKS_RG}" \
+            --name "${AKS_NAME}" \
+            --overwrite-existing \
+            --convert-kubeconfig
+
+          # Convert to use kubelogin for Azure AD auth
+          kubelogin convert-kubeconfig -l msi || true
+
+          echo "✅ AKS credentials configured."
+
+      - name: Argo CD Sync
+        run: |
+          set -euo pipefail
+          ADDON_TYPE="${{ inputs.addon_type }}"
+          ARGO_NS="${{ env.ARGOCD_NAMESPACE }}"
+
+          echo "Syncing Argo CD application for ${ADDON_TYPE}..."
+
+          # Retry logic: if argocd CLI fails twice, fall back to kubectl
+          MAX_RETRIES=2
+          RETRY_COUNT=0
+          SYNC_SUCCESS=false
+
+          while [ ${RETRY_COUNT} -lt ${MAX_RETRIES} ] && [ "${SYNC_SUCCESS}" == "false" ]; do
+            if argocd app sync "${ADDON_TYPE}" --namespace "${ARGO_NS}" 2>/dev/null; then
+              SYNC_SUCCESS=true
+              echo "✅ Argo CD sync successful via argocd CLI."
+            else
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              echo "argocd CLI attempt ${RETRY_COUNT} failed."
+              sleep 5
+            fi
+          done
+
+          if [ "${SYNC_SUCCESS}" == "false" ]; then
+            echo "Falling back to kubectl for Argo CD sync..."
+            kubectl patch application "${ADDON_TYPE}" -n "${ARGO_NS}" \
+              --type merge \
+              -p '{"operation":{"sync":{"revision":"HEAD"}}}' 2>/dev/null || {
+              echo "::error::Both argocd CLI and kubectl fallback failed."
+              exit 1
+            }
+            echo "✅ Argo CD sync triggered via kubectl patch."
+          fi
+
+      - name: Configure Add-On
+        run: |
+          set -euo pipefail
+          ADDON_TYPE="${{ inputs.addon_type }}"
+          PROVIDER="${{ inputs.external_ca_provider }}"
+
+          echo "Configuring ${ADDON_TYPE}..."
+
+          case "${ADDON_TYPE}" in
+            external_ca)
+              echo "Configuring external CA gateway for provider: ${PROVIDER}"
+              kubectl apply -f "gitops/external-ca-gateway/${PROVIDER}/" -n pki 2>/dev/null || \
+                echo "::warning::No provider-specific config found for ${PROVIDER}"
+              ;;
+            scep)
+              echo "Configuring SCEP protocol endpoint"
+              kubectl apply -f gitops/scep/ -n pki 2>/dev/null || \
+                echo "::warning::No SCEP config found"
+              ;;
+            acme)
+              echo "Configuring ACME protocol endpoint"
+              kubectl apply -f gitops/acme/ -n pki 2>/dev/null || \
+                echo "::warning::No ACME config found"
+              ;;
+            monitoring)
+              echo "Configuring monitoring stack"
+              kubectl apply -f gitops/monitoring/ -n monitoring 2>/dev/null || \
+                echo "::warning::No monitoring config found"
+              ;;
+            additional_gateway)
+              echo "Configuring additional gateway"
+              kubectl apply -f gitops/gateway/ -n pki 2>/dev/null || \
+                echo "::warning::No gateway config found"
+              ;;
+            additional_worker)
+              echo "Configuring additional worker"
+              kubectl apply -f gitops/worker/ -n pki 2>/dev/null || \
+                echo "::warning::No worker config found"
+              ;;
+          esac
+
+          echo "✅ Add-on configuration applied."
+
+      - name: Verify Deployment
+        run: |
+          set -euo pipefail
+          ADDON_TYPE="${{ inputs.addon_type }}"
+          NS="${{ env.ADDON_NAMESPACE }}"
+
+          echo "Verifying ${ADDON_TYPE} deployment..."
+
+          # Wait for pods to be ready
+          kubectl wait --for=condition=ready pod \
+            -l "app=${ADDON_TYPE}" \
+            -n "${NS}" \
+            --timeout=300s 2>/dev/null || {
+            echo "::warning::Pods not ready within timeout. Checking status..."
+            kubectl get pods -n "${NS}" -l "app=${ADDON_TYPE}"
+          }
+
+          # Check pod status
+          RUNNING_PODS=$(kubectl get pods -n "${NS}" -l "app=${ADDON_TYPE}" \
+            --field-selector=status.phase=Running \
+            -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | wc -w)
+
+          if [ "${RUNNING_PODS}" -gt 0 ]; then
+            echo "✅ ${RUNNING_PODS} pod(s) running for ${ADDON_TYPE}."
+          else
+            echo "::error::No running pods found for ${ADDON_TYPE}."
+            exit 1
+          fi
+
+  # ===========================================================================
+  # JOB 5: SMOKE TESTS
+  # ===========================================================================
+  smoke-tests:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    needs: deploy-addon
+    if: inputs.operation == 'deploy'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.31.0'
+
+      - name: Setup kubelogin
+        uses: azure/use-kubelogin@v1
+        with:
+          kubelogin-version: 'v0.1.4'
+
+      - name: Get AKS Credentials
+        run: |
+          set -euo pipefail
+          AKS_NAME="pki-${{ inputs.customer_id }}-${{ inputs.environment }}-aks"
+          AKS_RG="pki-${{ inputs.customer_id }}-${{ inputs.environment }}-rg"
+
+          az aks get-credentials \
+            --resource-group "${AKS_RG}" \
+            --name "${AKS_NAME}" \
+            --overwrite-existing \
+            --convert-kubeconfig
+
+          kubelogin convert-kubeconfig -l msi || true
+
+      - name: Connectivity Tests
+        run: |
+          set -euo pipefail
+          ADDON_TYPE="${{ inputs.addon_type }}"
+          NS="${{ env.ADDON_NAMESPACE }}"
+
+          echo "Running connectivity tests for ${ADDON_TYPE}..."
+
+          # Test 1: Pod-to-pod connectivity
+          POD_NAME=$(kubectl get pods -n "${NS}" -l "app=${ADDON_TYPE}" \
+            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+          if [ -n "${POD_NAME}" ]; then
+            echo "Testing DNS resolution from pod ${POD_NAME}..."
+            kubectl exec -n "${NS}" "${POD_NAME}" -- nslookup kubernetes.default 2>/dev/null || \
+              echo "::warning::DNS resolution test failed"
+
+            echo "Testing outbound HTTPS from pod ${POD_NAME}..."
+            kubectl exec -n "${NS}" "${POD_NAME}" -- curl -s -o /dev/null -w "%{http_code}" \
+              --max-time 10 https://api.digicert.com 2>/dev/null || \
+              echo "::warning::Outbound HTTPS test failed"
+          else
+            echo "::warning::No pods found for connectivity testing."
+          fi
+
+          echo "✅ Connectivity tests completed."
+
+      - name: Authentication Tests
+        if: inputs.addon_type == 'external_ca'
+        run: |
+          set -euo pipefail
+          PROVIDER="${{ inputs.external_ca_provider }}"
+          NS="${{ env.ADDON_NAMESPACE }}"
+
+          echo "Running authentication tests for ${PROVIDER}..."
+
+          # Test credential validation without printing secrets
+          POD_NAME=$(kubectl get pods -n "${NS}" -l "app=external-ca-gateway" \
+            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+          if [ -n "${POD_NAME}" ]; then
+            echo "Testing credential validation..."
+            kubectl exec -n "${NS}" "${POD_NAME}" -- \
+              /bin/sh -c 'test -n "$EXTERNAL_CA_API_KEY" && echo "OK" || echo "MISSING"' 2>/dev/null || \
+              echo "::warning::Credential validation test failed"
+          else
+            echo "::warning::No external CA gateway pods found."
+          fi
+
+          echo "✅ Authentication tests completed."
+
+      - name: PKI Tests
+        run: |
+          set -euo pipefail
+          ADDON_TYPE="${{ inputs.addon_type }}"
+          NS="${{ env.ADDON_NAMESPACE }}"
+
+          echo "Running PKI tests for ${ADDON_TYPE}..."
+
+          # Test certificate request via cert-api
+          echo "Testing certificate API availability..."
+          kubectl get svc -n "${NS}" cert-api 2>/dev/null && \
+            echo "OK: cert-api service exists" || \
+            echo "::warning::cert-api service not found"
+
+          # Test CA abstraction layer
+          echo "Testing CA abstraction layer..."
+          kubectl get pods -n "${NS}" -l "app=ca-service" 2>/dev/null | grep -q Running && \
+            echo "OK: ca-service is running" || \
+            echo "::warning::ca-service not running"
+
+          echo "✅ PKI tests completed."
+
+      - name: Idempotency Tests
+        run: |
+          set -euo pipefail
+          ADDON_TYPE="${{ inputs.addon_type }}"
+
+          echo "Running idempotency tests for ${ADDON_TYPE}..."
+
+          # Setup Terraform for re-plan
+          cd "${{ env.TERRAFORM_WORKING_DIR }}"
+
+          terraform init \
+            -backend-config="resource_group_name=pki-terraform-state" \
+            -backend-config="storage_account_name=pkterraformstate" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=${{ needs.validate.outputs.state_key }}" \
+            -input=false > /dev/null 2>&1
+
+          # Re-run terraform plan to verify no changes
+          terraform plan -detailed-exitcode \
+            -var="customer_id=${{ inputs.customer_id }}" \
+            -var="environment=${{ inputs.environment }}" \
+            -var="service_tier=${{ inputs.deployment_profile }}" \
+            -var="addon_type=${{ inputs.addon_type }}" \
+            -var="external_ca_provider=${{ inputs.external_ca_provider }}" \
+            2>&1 | tee /tmp/tfplan-idempotency.log
+
+          EXIT_CODE=$?
+          if [ ${EXIT_CODE} -eq 0 ]; then
+            echo "✅ No changes detected. Deployment is idempotent."
+          elif [ ${EXIT_CODE} -eq 2 ]; then
+            echo "::warning::Changes detected on re-plan. Review /tmp/tfplan-idempotency.log"
+          else
+            echo "::error::Terraform plan failed during idempotency test."
+            exit 1
+          fi
+
+          echo "✅ Idempotency tests completed."
+
+  # ===========================================================================
+  # JOB 6: REPORT
+  # ===========================================================================
+  report:
+    name: Report
+    runs-on: ubuntu-latest
+    needs: [validate, plan, approval, deploy-addon, smoke-tests]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate Deployment Report
+        run: |
+          set -euo pipefail
+
+          REPORT_FILE="deployment-report-${{ github.run_id }}.md"
+
+          cat > "${REPORT_FILE}" << EOF
+          # Add-On Deployment Report
+
+          **Run ID:** ${{ github.run_id }}
+          **Run Number:** ${{ github.run_number }}
+          **Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          **Workflow:** ${{ github.workflow }}
+          **Actor:** ${{ github.actor }}
+
+          ## Parameters
+          | Parameter | Value |
+          |-----------|-------|
+          | Customer ID | ${{ inputs.customer_id }} |
+          | Environment | ${{ inputs.environment }} |
+          | Add-On Type | ${{ inputs.addon_type }} |
+          | External CA Provider | ${{ inputs.external_ca_provider }} |
+          | Deployment Profile | ${{ inputs.deployment_profile }} |
+          | Operation | ${{ inputs.operation }} |
+
+          ## Job Results
+          | Job | Status |
+          |-----|--------|
+          | Validate | ${{ needs.validate.result }} |
+          | Plan | ${{ needs.plan.result }} |
+          | Approval | ${{ needs.approval.result }} |
+          | Deploy Add-On | ${{ needs.deploy-addon.result }} |
+          | Smoke Tests | ${{ needs.smoke-tests.result }} |
+
+          ## Plan Results
+          | Metric | Value |
+          |--------|-------|
+          | Plan Exit Code | ${{ needs.plan.outputs.plan_exitcode }} |
+          | Has Changes | ${{ needs.plan.outputs.has_changes }} |
+          | Duplicate Detected | ${{ needs.validate.outputs.duplicate_detected }} |
+
+          ## Notes
+          - Report generated automatically by GitHub Actions workflow.
+          - Review individual job logs for detailed output.
+          EOF
+
+          echo "Report generated: ${REPORT_FILE}"
+          cat "${REPORT_FILE}"
+
+      - name: Upload Report Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-report
+          path: deployment-report-${{ github.run_id }}.md
+          retention-days: 30
+
+      - name: Add Summary to GitHub
+        run: |
+          cat deployment-report-${{ github.run_id }}.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify Stakeholders
+        run: |
+          echo "Notification placeholder:"
+          echo "  To: platform-team@contoso.com"
+          echo "  Subject: Add-On ${{ inputs.addon_type }} ${{ inputs.operation }} for ${{ inputs.customer_id }}/${{ inputs.environment }}"
+          echo "  Status: ${{ needs.deploy-addon.result }}"
+          echo ""
+          echo "In production, integrate with:"
+          echo "  - Azure Logic Apps"
+          echo "  - Microsoft Teams webhook"
+          echo "  - Slack webhook"
+          echo "  - Email via SendGrid/Exchange"
+          echo ""
+          echo "::notice::Notification would be sent here in production."

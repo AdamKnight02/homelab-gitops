@@ -1,1056 +1,781 @@
 # =============================================================================
-# Azure Deploy Customer Pipeline
+# Azure Deploy Customer — GitHub Actions Workflow
 # =============================================================================
 # Deploy Environment Pipeline for the PKI Platform on Azure.
 # Implements the 7-stage architecture: Validate → Plan → Approval →
 # Deploy Infrastructure → Deploy Platform → Smoke Tests → Report
 #
-# Usage:
-#   - Manual trigger with parameters
-#   - Requires Azure service connection: 'azure-service-connection'
-#   - Requires Terraform task extension (optional, falls back to CLI)
-#
-# Backend:
-#   - Local state by default (plan-only validation)
-#   - Remote state via backend.hcl (uncomment when bootstrap deployed)
+# Trigger: workflow_dispatch (manual with inputs)
+# Backend: Local state by default (plan-only validation)
 # =============================================================================
 
-trigger: none
-pr: none
-
-# ---------------------------------------------------------------------------
-# Parameters
-# ---------------------------------------------------------------------------
-parameters:
-  - name: customer_id
-    displayName: 'Customer ID'
-    type: string
-    # Example: contoso, fabrikam, adventure-works
-
-  - name: environment
-    displayName: 'Environment'
-    type: string
-    values:
-      - lab
-      - dev
-      - staging
-      - production
-    default: lab
-
-  - name: service_tier
-    displayName: 'Service Tier'
-    type: string
-    values:
-      - economy
-      - standard
-      - enterprise
-    default: economy
-
-  - name: region_class
-    displayName: 'Region Class'
-    type: string
-    values:
-      - primary
-      - secondary
-      - dr
-    default: primary
-
-  - name: scep_enabled
-    displayName: 'Enable SCEP Protocol'
-    type: boolean
-    default: false
-
-  - name: acme_enabled
-    displayName: 'Enable ACME Protocol'
-    type: boolean
-    default: false
-
-  - name: external_ca
-    displayName: 'External CA Provider'
-    type: string
-    values:
-      - none
-      - letsencrypt
-      - digicert
-      - sectigo
-      - globalsign
-      - entrust
-      - godaddy
-      - custom
-    default: none
-
-  - name: monitoring_enabled
-    displayName: 'Enable Monitoring Stack'
-    type: boolean
-    default: true
-
-  - name: operation
-    displayName: 'Operation'
-    type: string
-    values:
-      - deploy
-      - plan
-      - destroy
-    default: deploy
-
-# ---------------------------------------------------------------------------
-# Variables
-# ---------------------------------------------------------------------------
-variables:
-  - name: terraformWorkingDir
-    value: 'infra/terraform/azure'
-  - name: azureServiceConnection
-    value: 'azure-service-connection'
-  - name: terraformVersion
-    value: '1.10.0'
-  # Resource count expectations per tier (validated in Plan stage)
-  - name: expectedResourcesEconomy
-    value: 10
-  - name: expectedResourcesStandard
-    value: 48
-  - name: expectedResourcesEnterprise
-    value: 81
-  # Retry configuration
-  - name: maxRetries
-    value: 2
-  - name: retryDelaySeconds
-    value: 30
-
-# ---------------------------------------------------------------------------
-# Stages
-# ---------------------------------------------------------------------------
-stages:
-  # =========================================================================
-  # STAGE 1: VALIDATE
-  # =========================================================================
-  - stage: Validate
-    displayName: 'Validate Configuration'
-    dependsOn: []
-    jobs:
-      - job: ValidateCustomerConfig
-        displayName: 'Validate Customer Configuration'
-        pool:
-          vmImage: 'ubuntu-latest'
-        steps:
-          - task: Bash@3
-            displayName: 'Validate Customer ID Format'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                CUSTOMER_ID='${{ parameters.customer_id }}'
-                if [ -z "$CUSTOMER_ID" ]; then
-                  echo "##vso[task.logissue type=error]Customer ID is required"
-                  exit 1
-                fi
-                if ! [[ "$CUSTOMER_ID" =~ ^[a-z0-9][a-z0-9-]*[a-z0-9]$ ]]; then
-                  echo "##vso[task.logissue type=error]Customer ID must be lowercase alphanumeric with hyphens"
-                  exit 1
-                fi
-                echo "Customer ID '$CUSTOMER_ID' is valid"
-
-          - task: Bash@3
-            displayName: 'Validate Environment and Tier Combination'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                ENV='${{ parameters.environment }}'
-                TIER='${{ parameters.service_tier }}'
-                echo "Validating environment=$ENV, tier=$TIER"
-                # Production requires standard or enterprise
-                if [ "$ENV" = "production" ] && [ "$TIER" = "economy" ]; then
-                  echo "##vso[task.logissue type=error]Production environment requires standard or enterprise tier"
-                  exit 1
-                fi
-                echo "Environment/tier combination is valid"
-
-          - task: AzureCLI@2
-            displayName: 'Validate Azure Credentials'
-            inputs:
-              azureSubscription: '$(azureServiceConnection)'
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                set -e
-                echo "Validating Azure credentials..."
-                az account show --query '{subscription:id, tenant:tenantId, name:name}' -o table
-                if [ $? -ne 0 ]; then
-                  echo "##vso[task.logissue type=error]Azure authentication failed"
-                  exit 1
-                fi
-                echo "Azure credentials validated"
-            continueOnError: false
-
-          # Fallback: Use PowerShell if AzureCLI fails twice
-          - task: AzurePowerShell@5
-            displayName: 'Validate Azure Credentials (Fallback)'
-            condition: failed()
-            inputs:
-              azureSubscription: '$(azureServiceConnection)'
-              ScriptType: 'InlineScript'
-              Inline: |
-                $ErrorActionPreference = 'Stop'
-                Write-Host "Fallback: Validating Azure credentials via PowerShell..."
-                $context = Get-AzContext
-                if (-not $context) {
-                  Write-Error "Azure authentication failed"
-                  exit 1
-                }
-                Write-Host "Subscription: $($context.Subscription.Id)"
-                Write-Host "Tenant: $($context.Tenant.Id)"
-              azurePowerShellVersion: 'LatestVersion'
-
-      - job: ValidateSchema
-        displayName: 'Validate Schema v2'
-        pool:
-          vmImage: 'ubuntu-latest'
-        steps:
-          - task: Bash@3
-            displayName: 'Validate Terraform Configuration Schema'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                echo "Validating Terraform configuration schema..."
-                cd $(terraformWorkingDir)
-                # Check required files exist
-                for f in main.tf variables.tf outputs.tf versions.tf; do
-                  if [ ! -f "$f" ]; then
-                    echo "##vso[task.logissue type=error]Missing required file: $f"
-                    exit 1
-                  fi
-                done
-                echo "Schema validation passed"
-
-          - task: Bash@3
-            displayName: 'Validate Variable Constraints'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                TIER='${{ parameters.service_tier }}'
-                REGION='${{ parameters.region_class }}'
-                echo "Validating variable constraints for tier=$TIER, region_class=$REGION"
-                # Region class validation
-                case "$REGION" in
-                  primary|secondary|dr)
-                    echo "Region class '$REGION' is valid"
-                    ;;
-                  *)
-                    echo "##vso[task.logissue type=error]Invalid region class: $REGION"
-                    exit 1
-                    ;;
-                esac
-
-      - job: ValidateExternalCA
-        displayName: 'Validate External CA Credentials'
-        condition: ne('${{ parameters.external_ca }}', 'none')
-        pool:
-          vmImage: 'ubuntu-latest'
-        steps:
-          - task: Bash@3
-            displayName: 'Check External CA Credential Placeholder'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                EXT_CA='${{ parameters.external_ca }}'
-                echo "External CA provider: $EXT_CA"
-                echo "NOTE: External CA credential validation is a placeholder."
-                echo "In production, this would validate API keys/certificates for $EXT_CA."
-                # Placeholder: Check if credential file exists (would be in secure storage)
-                # For now, just log the requirement
-                echo "Required credentials for $EXT_CA would be validated here"
-
-      - job: ValidateCostGuardrails
-        displayName: 'Validate Cost Guardrails'
-        pool:
-          vmImage: 'ubuntu-latest'
-        steps:
-          - task: Bash@3
-            displayName: 'Check Tier Resource Limits'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                TIER='${{ parameters.service_tier }}'
-                echo "Checking cost guardrails for tier: $TIER"
-                case "$TIER" in
-                  economy)
-                    MAX_VMS=2
-                    MAX_PUBLIC_IPS=1
-                    MAX_NAT_GW=0
-                    MAX_MANAGED_K8S=0
-                    ;;
-                  standard)
-                    MAX_VMS=5
-                    MAX_PUBLIC_IPS=2
-                    MAX_NAT_GW=0
-                    MAX_MANAGED_K8S=0
-                    ;;
-                  enterprise)
-                    MAX_VMS=10
-                    MAX_PUBLIC_IPS=4
-                    MAX_NAT_GW=1
-                    MAX_MANAGED_K8S=0
-                    ;;
-                esac
-                echo "Tier limits: VMs<=$MAX_VMS, PublicIPs<=$MAX_PUBLIC_IPS, NATGW<=$MAX_NAT_GW"
-                echo "Cost guardrails validated"
-
-  # =========================================================================
-  # STAGE 2: PLAN
-  # =========================================================================
-  - stage: Plan
-    displayName: 'Terraform Plan'
-    dependsOn: Validate
-    condition: succeeded()
-    jobs:
-      - job: TerraformPlan
-        displayName: 'Terraform Plan and Analysis'
-        pool:
-          vmImage: 'ubuntu-latest'
-        steps:
-          - task: Bash@3
-            displayName: 'Install Terraform'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                TF_VERSION='$(terraformVersion)'
-                echo "Installing Terraform $TF_VERSION..."
-                if command -v terraform &> /dev/null; then
-                  CURRENT=$(terraform version -json | jq -r '.terraform_version')
-                  echo "Terraform $CURRENT already installed"
-                else
-                  wget -q "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip"
-                  unzip -q "terraform_${TF_VERSION}_linux_amd64.zip"
-                  sudo mv terraform /usr/local/bin/
-                  rm "terraform_${TF_VERSION}_linux_amd64.zip"
-                fi
-                terraform version
-
-          # Backend configuration (commented until bootstrap deployed)
-          - task: Bash@3
-            displayName: 'Configure Backend (Optional)'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                cd $(terraformWorkingDir)
-                # Backend configuration for remote state
-                # Uncomment when bootstrap layer has created state infrastructure
-                #
-                # if [ -f backend.hcl ]; then
-                #   echo "Using remote state backend from backend.hcl"
-                #   terraform init -backend-config=backend.hcl
-                # else
-                #   echo "Using local state (bootstrap not deployed)"
-                #   terraform init
-                # fi
-                #
-                # For now, always use local state
-                echo "Using local state backend (remote state not yet configured)"
-                terraform init -input=false
-
-          - task: Bash@3
-            displayName: 'Generate Terraform Variables'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                cd $(terraformWorkingDir)
-                cat > terraform.tfvars <<EOF
-                # Auto-generated by pipeline
-                service_tier = "${{ parameters.service_tier }}"
-                environment = "${{ parameters.environment }}"
-                azure_region = "eastus"  # Default, could be parameterized
-                project_name = "pki-${{ parameters.customer_id }}"
-                owner = "pipeline"
-                managed_by = "azure-devops"
-                ephemeral = true
-                cost_center = "${{ parameters.customer_id }}"
-                # Protocol toggles (deployed via K3s, not Terraform)
-                # scep_enabled = ${{ parameters.scep_enabled }}
-                # acme_enabled = ${{ parameters.acme_enabled }}
-                # external_ca = "${{ parameters.external_ca }}"
-                # monitoring_enabled = ${{ parameters.monitoring_enabled }}
-                EOF
-                cat terraform.tfvars
-
-          - task: AzureCLI@2
-            displayName: 'Terraform Plan'
-            inputs:
-              azureSubscription: '$(azureServiceConnection)'
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                set -e
-                cd $(terraformWorkingDir)
-                echo "Running Terraform plan..."
-                terraform plan -out=tfplan -detailed-exitcode 2>&1 | tee plan.log
-                EXIT_CODE=${PIPESTATUS[0]}
-                if [ $EXIT_CODE -eq 0 ]; then
-                  echo "No changes required"
-                elif [ $EXIT_CODE -eq 2 ]; then
-                  echo "Changes planned successfully"
-                else
-                  echo "##vso[task.logissue type=error]Terraform plan failed with exit code $EXIT_CODE"
-                  exit $EXIT_CODE
-                fi
-                # Save plan for apply stage
-                echo "##vso[task.setvariable variable=planExitCode]$EXIT_CODE"
-            continueOnError: false
-
-          # Fallback: Direct script if AzureCLI fails
-          - task: Bash@3
-            displayName: 'Terraform Plan (Fallback)'
-            condition: failed()
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                cd $(terraformWorkingDir)
-                echo "Fallback: Running Terraform plan via direct script..."
-                # Set Azure credentials from service connection
-                export ARM_CLIENT_ID="$servicePrincipalId"
-                export ARM_CLIENT_SECRET="$servicePrincipalKey"
-                export ARM_SUBSCRIPTION_ID="$subscriptionId"
-                export ARM_TENANT_ID="$tenantId"
-                terraform plan -out=tfplan -detailed-exitcode 2>&1 | tee plan.log
-                EXIT_CODE=${PIPESTATUS[0]}
-                if [ $EXIT_CODE -eq 0 ] || [ $EXIT_CODE -eq 2 ]; then
-                  echo "Plan completed with exit code $EXIT_CODE"
-                else
-                  echo "##vso[task.logissue type=error]Terraform plan failed"
-                  exit $EXIT_CODE
-                fi
-
-          - task: Bash@3
-            displayName: 'Resource Count Validation'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                cd $(terraformWorkingDir)
-                TIER='${{ parameters.service_tier }}'
-                # Expected resource counts per tier
-                case "$TIER" in
-                  economy) EXPECTED=$(expectedResourcesEconomy) ;;
-                  standard) EXPECTED=$(expectedResourcesStandard) ;;
-                  enterprise) EXPECTED=$(expectedResourcesEnterprise) ;;
-                esac
-                echo "Expected resources for $TIER tier: $EXPECTED"
-                # Count planned resources from plan output
-                if [ -f plan.log ]; then
-                  PLANNED=$(grep -c "Plan:" plan.log || echo "0")
-                  echo "Resources planned: $PLANNED"
-                  # Note: Actual count extraction requires terraform show -json
-                  # This is a simplified check
-                  echo "Resource count validation passed (placeholder)"
-                else
-                  echo "No plan log found, skipping count validation"
-                fi
-
-          - task: Bash@3
-            displayName: 'Cost Estimate'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                TIER='${{ parameters.service_tier }}'
-                echo "Estimating costs for tier: $TIER"
-                case "$TIER" in
-                  economy)
-                    echo "Estimated monthly cost: ~\$33 USD"
-                    echo "  - 1x Standard_B2s VM"
-                    echo "  - Basic networking"
-                    ;;
-                  standard)
-                    echo "Estimated monthly cost: ~\$200 USD"
-                    echo "  - 3x VMs"
-                    echo "  - Azure Database for PostgreSQL"
-                    echo "  - Load Balancer"
-                    ;;
-                  enterprise)
-                    echo "Estimated monthly cost: ~\$1000 USD"
-                    echo "  - 6x VMs (multi-zone)"
-                    echo "  - HA Database"
-                    echo "  - Key Vault"
-                    echo "  - Monitoring stack"
-                    ;;
-                esac
-                echo "Cost estimate completed"
-
-          - task: Bash@3
-            displayName: 'Security Scan Placeholder'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                echo "Security scanning placeholder"
-                echo "In production, this would run:"
-                echo "  - tfsec (Terraform security scanner)"
-                echo "  - checkov (Policy-as-code scanner)"
-                echo "  - terrascan (Compliance scanner)"
-                echo ""
-                echo "Example: tfsec $(terraformWorkingDir) --format json > tfsec-results.json"
-                echo "Security scan placeholder completed"
-
-          - task: PublishPipelineArtifact@1
-            displayName: 'Publish Plan Artifacts'
-            inputs:
-              targetPath: '$(terraformWorkingDir)/tfplan'
-              artifact: 'terraform-plan'
-              publishLocation: 'pipeline'
-            condition: succeededOrFailed()
-
-  # =========================================================================
-  # STAGE 3: APPROVAL
-  # =========================================================================
-  - stage: Approval
-    displayName: 'Manual Approval'
-    dependsOn: Plan
-    condition: and(succeeded(), eq('${{ parameters.operation }}', 'deploy'))
-    jobs:
-      - job: ManualApproval
-        displayName: 'Review and Approve Deployment'
-        pool: server
-        steps:
-          - task: ManualValidation@0
-            displayName: 'Approve Terraform Plan'
-            inputs:
-              notifyUsers: |
-                security-team@contoso.com
-                platform-team@contoso.com
-              instructions: |
-                Review the Terraform plan and cost estimate before approving.
-
-                Customer: ${{ parameters.customer_id }}
-                Environment: ${{ parameters.environment }}
-                Tier: ${{ parameters.service_tier }}
-                Operation: ${{ parameters.operation }}
-
-                Please verify:
-                1. Resource counts match expected tier configuration
-                2. Cost estimate is acceptable
-                3. Security scan results are reviewed
-                4. External CA configuration (if any) is correct
-              onTimeout: 'reject'
-
-      - job: CostApproval
-        displayName: 'Cost Approval'
-        pool: server
-        condition: eq('${{ parameters.service_tier }}', 'enterprise')
-        steps:
-          - task: ManualValidation@0
-            displayName: 'Approve Enterprise Tier Costs'
-            inputs:
-              notifyUsers: 'finance-team@contoso.com'
-              instructions: |
-                Enterprise tier deployment requested.
-
-                Estimated monthly cost: ~$1000 USD
-
-                Please approve the cost for this deployment.
-              onTimeout: 'reject'
-
-      - job: SecurityApproval
-        displayName: 'Security Approval'
-        pool: server
-        condition: or(eq('${{ parameters.environment }}', 'production'), ne('${{ parameters.external_ca }}', 'none'))
-        steps:
-          - task: ManualValidation@0
-            displayName: 'Security Review Approval'
-            inputs:
-              notifyUsers: 'security-team@contoso.com'
-              instructions: |
-                Security review required for this deployment.
-
-                Environment: ${{ parameters.environment }}
-                External CA: ${{ parameters.external_ca }}
-
-                Please review the security scan results and approve.
-              onTimeout: 'reject'
-
-  # =========================================================================
-  # STAGE 4: DEPLOY INFRASTRUCTURE
-  # =========================================================================
-  - stage: DeployInfrastructure
-    displayName: 'Deploy Infrastructure'
-    dependsOn: Approval
-    condition: and(succeeded(), or(eq('${{ parameters.operation }}', 'deploy'), eq('${{ parameters.operation }}', 'destroy')))
-    jobs:
-      - job: TerraformApply
-        displayName: 'Terraform Apply'
-        pool:
-          vmImage: 'ubuntu-latest'
-        steps:
-          - task: Bash@3
-            displayName: 'Install Terraform'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                TF_VERSION='$(terraformVersion)'
-                if ! command -v terraform &> /dev/null; then
-                  wget -q "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip"
-                  unzip -q "terraform_${TF_VERSION}_linux_amd64.zip"
-                  sudo mv terraform /usr/local/bin/
-                fi
-                terraform version
-
-          - task: Bash@3
-            displayName: 'Initialize Terraform'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                cd $(terraformWorkingDir)
-                terraform init -input=false
-
-          - task: Bash@3
-            displayName: 'Download Plan Artifact'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                cd $(terraformWorkingDir)
-                # In a real pipeline, download the plan artifact from previous stage
-                # For now, regenerate if needed
-                if [ ! -f tfplan ]; then
-                  echo "Regenerating plan..."
-                  terraform plan -out=tfplan
-                fi
-
-          - task: AzureCLI@2
-            displayName: 'Terraform Apply'
-            inputs:
-              azureSubscription: '$(azureServiceConnection)'
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                set -e
-                cd $(terraformWorkingDir)
-                OPERATION='${{ parameters.operation }}'
-                if [ "$OPERATION" = "destroy" ]; then
-                  echo "Running Terraform destroy..."
-                  terraform destroy -auto-approve
-                else
-                  echo "Running Terraform apply..."
-                  terraform apply -auto-approve tfplan
-                fi
-                echo "Terraform $OPERATION completed"
-            continueOnError: false
-
-          # Fallback: Direct script approach
-          - task: Bash@3
-            displayName: 'Terraform Apply (Fallback)'
-            condition: failed()
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                cd $(terraformWorkingDir)
-                export ARM_CLIENT_ID="$servicePrincipalId"
-                export ARM_CLIENT_SECRET="$servicePrincipalKey"
-                export ARM_SUBSCRIPTION_ID="$subscriptionId"
-                export ARM_TENANT_ID="$tenantId"
-                OPERATION='${{ parameters.operation }}'
-                if [ "$OPERATION" = "destroy" ]; then
-                  terraform destroy -auto-approve
-                else
-                  terraform apply -auto-approve tfplan
-                fi
-
-          - task: Bash@3
-            displayName: 'Wait for K3s Ready'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                echo "Waiting for K3s to be ready..."
-                echo "This is a placeholder for K3s readiness check."
-                echo "In production, this would:"
-                echo "  1. Get VM IP from Terraform output"
-                echo "  2. SSH to VM and check k3s status"
-                echo "  3. Wait for node to be Ready"
-                echo "  4. Verify all system pods are running"
-                sleep 10  # Placeholder
-                echo "K3s readiness check completed (placeholder)"
-
-          - task: Bash@3
-            displayName: 'Verify Resources'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                cd $(terraformWorkingDir)
-                echo "Verifying deployed resources..."
-                terraform output -json > outputs.json
-                cat outputs.json | jq '.'
-                echo "Resource verification completed"
-
-          - task: Bash@3
-            displayName: 'Output State'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                cd $(terraformWorkingDir)
-                echo "Capturing Terraform state outputs..."
-                terraform output -json > $(Build.ArtifactStagingDirectory)/terraform-outputs.json
-                echo "State outputs saved"
-
-          - task: PublishPipelineArtifact@1
-            displayName: 'Publish State Outputs'
-            inputs:
-              targetPath: '$(Build.ArtifactStagingDirectory)/terraform-outputs.json'
-              artifact: 'terraform-outputs'
-              publishLocation: 'pipeline'
-
-  # =========================================================================
-  # STAGE 5: DEPLOY PLATFORM
-  # =========================================================================
-  - stage: DeployPlatform
-    displayName: 'Deploy Platform'
-    dependsOn: DeployInfrastructure
-    condition: and(succeeded(), eq('${{ parameters.operation }}', 'deploy'))
-    jobs:
-      - job: ArgoCDSync
-        displayName: 'Argo CD Sync'
-        pool:
-          vmImage: 'ubuntu-latest'
-        steps:
-          - task: Bash@3
-            displayName: 'Install kubectl and ArgoCD CLI'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                # Install kubectl
-                if ! command -v kubectl &> /dev/null; then
-                  curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-                  chmod +x kubectl
-                  sudo mv kubectl /usr/local/bin/
-                fi
-                kubectl version --client
-                # Install ArgoCD CLI (optional)
-                echo "ArgoCD CLI installation placeholder"
-
-          - task: Bash@3
-            displayName: 'Configure kubeconfig'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                echo "Configuring kubeconfig..."
-                echo "This is a placeholder for kubeconfig setup."
-                echo "In production, this would:"
-                echo "  1. Get K3s kubeconfig from VM or Terraform output"
-                echo "  2. Configure kubectl to use it"
-                echo "  3. Verify cluster connectivity"
-                # Placeholder: Create dummy kubeconfig
-                mkdir -p ~/.kube
-                echo "kubeconfig placeholder" > ~/.kube/config
-
-          - task: Bash@3
-            displayName: 'Argo CD Sync'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                echo "Syncing Argo CD applications..."
-                echo "This is a placeholder for Argo CD sync."
-                echo "In production, this would:"
-                echo "  1. Port-forward to Argo CD server"
-                echo "  2. Login to Argo CD"
-                echo "  3. Sync all applications"
-                echo "  4. Wait for sync to complete"
-                sleep 5
-                echo "Argo CD sync completed (placeholder)"
-
-          - task: Bash@3
-            displayName: 'Wait for Apps Synced'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                echo "Waiting for applications to sync..."
-                echo "Placeholder: Would check Argo CD app status"
-                sleep 5
-                echo "Applications synced (placeholder)"
-
-          - task: Bash@3
-            displayName: 'Verify Pods'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                echo "Verifying pod status..."
-                echo "Placeholder: Would check pod status with kubectl"
-                # kubectl get pods -A
-                echo "Pod verification completed (placeholder)"
-
-          - task: Bash@3
-            displayName: 'Configure External CA'
-            condition: ne('${{ parameters.external_ca }}', 'none')
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                EXT_CA='${{ parameters.external_ca }}'
-                echo "Configuring External CA: $EXT_CA"
-                echo "This is a placeholder for external CA configuration."
-                echo "In production, this would:"
-                echo "  1. Deploy external CA gateway"
-                echo "  2. Configure cert-manager issuer"
-                echo "  3. Test certificate issuance"
-                echo "External CA configuration completed (placeholder)"
-
-  # =========================================================================
-  # STAGE 6: SMOKE TESTS
-  # =========================================================================
-  - stage: SmokeTests
-    displayName: 'Smoke Tests'
-    dependsOn: DeployPlatform
-    condition: and(succeeded(), eq('${{ parameters.operation }}', 'deploy'))
-    jobs:
-      - job: StaticValidation
-        displayName: 'Static Validation'
-        pool:
-          vmImage: 'ubuntu-latest'
-        steps:
-          - task: Bash@3
-            displayName: 'Validate Terraform State'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                echo "Running static validation..."
-                echo "Placeholder: Would validate Terraform state consistency"
-                echo "Static validation completed"
-
-      - job: InfrastructureTests
-        displayName: 'Infrastructure Tests'
-        pool:
-          vmImage: 'ubuntu-latest'
-        steps:
-          - task: AzureCLI@2
-            displayName: 'Verify Azure Resources'
-            inputs:
-              azureSubscription: '$(azureServiceConnection)'
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                set -e
-                echo "Verifying Azure resources..."
-                echo "Placeholder: Would verify:"
-                echo "  - Resource group exists"
-                echo "  - VMs are running"
-                echo "  - Network is configured"
-                echo "  - NSG rules are correct"
-                echo "Infrastructure tests completed (placeholder)"
-
-      - job: KubernetesTests
-        displayName: 'Kubernetes Tests'
-        pool:
-          vmImage: 'ubuntu-latest'
-        steps:
-          - task: Bash@3
-            displayName: 'Test K8s Cluster'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                echo "Testing Kubernetes cluster..."
-                echo "Placeholder: Would test:"
-                echo "  - Node status"
-                echo "  - Pod status"
-                echo "  - Service endpoints"
-                echo "  - Ingress controllers"
-                echo "Kubernetes tests completed (placeholder)"
-
-      - job: PlatformTests
-        displayName: 'Platform Tests'
-        pool:
-          vmImage: 'ubuntu-latest'
-        steps:
-          - task: Bash@3
-            displayName: 'Test Platform Services'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                echo "Testing platform services..."
-                echo "Placeholder: Would test:"
-                echo "  - Argo CD UI accessible"
-                echo "  - cert-manager running"
-                echo "  - OpenBao/Vault accessible"
-                echo "Platform tests completed (placeholder)"
-
-      - job: PKITests
-        displayName: 'PKI Tests'
-        pool:
-          vmImage: 'ubuntu-latest'
-        steps:
-          - task: Bash@3
-            displayName: 'Test PKI Functionality'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                SCEP='${{ parameters.scep_enabled }}'
-                ACME='${{ parameters.acme_enabled }}'
-                echo "Testing PKI functionality..."
-                echo "SCEP enabled: $SCEP"
-                echo "ACME enabled: $ACME"
-                echo "Placeholder: Would test:"
-                echo "  - CA certificate issuance"
-                if [ "$SCEP" = "true" ]; then
-                  echo "  - SCEP enrollment"
-                fi
-                if [ "$ACME" = "true" ]; then
-                  echo "  - ACME certificate issuance"
-                fi
-                echo "PKI tests completed (placeholder)"
-
-      - job: MonitoringTests
-        displayName: 'Monitoring Tests'
-        condition: eq('${{ parameters.monitoring_enabled }}', true)
-        pool:
-          vmImage: 'ubuntu-latest'
-        steps:
-          - task: Bash@3
-            displayName: 'Test Monitoring Stack'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                echo "Testing monitoring stack..."
-                echo "Placeholder: Would test:"
-                echo "  - Prometheus metrics"
-                echo "  - Grafana dashboards"
-                echo "  - Alertmanager configuration"
-                echo "Monitoring tests completed (placeholder)"
-
-      - job: ExternalCATests
-        displayName: 'External CA Tests'
-        condition: ne('${{ parameters.external_ca }}', 'none')
-        pool:
-          vmImage: 'ubuntu-latest'
-        steps:
-          - task: Bash@3
-            displayName: 'Test External CA Integration'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                EXT_CA='${{ parameters.external_ca }}'
-                echo "Testing External CA integration: $EXT_CA"
-                echo "Placeholder: Would test:"
-                echo "  - Connectivity to $EXT_CA API"
-                echo "  - Certificate issuance via $EXT_CA"
-                echo "  - Chain validation"
-                echo "External CA tests completed (placeholder)"
-
-  # =========================================================================
-  # STAGE 7: REPORT
-  # =========================================================================
-  - stage: Report
-    displayName: 'Generate Report'
-    dependsOn: SmokeTests
-    condition: succeededOrFailed()
-    jobs:
-      - job: GenerateReport
-        displayName: 'Generate Deployment Report'
-        pool:
-          vmImage: 'ubuntu-latest'
-        steps:
-          - task: Bash@3
-            displayName: 'Generate Report'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                mkdir -p $(Build.ArtifactStagingDirectory)/report
-                cat > $(Build.ArtifactStagingDirectory)/report/deployment-report.md <<EOF
-                # Deployment Report
-
-                ## Summary
-                - **Customer:** ${{ parameters.customer_id }}
-                - **Environment:** ${{ parameters.environment }}
-                - **Service Tier:** ${{ parameters.service_tier }}
-                - **Region Class:** ${{ parameters.region_class }}
-                - **Operation:** ${{ parameters.operation }}
-                - **Timestamp:** $(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-                ## Configuration
-                - **SCEP Enabled:** ${{ parameters.scep_enabled }}
-                - **ACME Enabled:** ${{ parameters.acme_enabled }}
-                - **External CA:** ${{ parameters.external_ca }}
-                - **Monitoring Enabled:** ${{ parameters.monitoring_enabled }}
-
-                ## Pipeline Status
-                - **Build ID:** $(Build.BuildId)
-                - **Build Number:** $(Build.BuildNumber)
-                - **Source Branch:** $(Build.SourceBranch)
-                - **Source Version:** $(Build.SourceVersion)
-
-                ## Stages
-                | Stage | Status |
-                |-------|--------|
-                | Validate | $(Agent.JobStatus) |
-                | Plan | $(Agent.JobStatus) |
-                | Approval | $(Agent.JobStatus) |
-                | Deploy Infrastructure | $(Agent.JobStatus) |
-                | Deploy Platform | $(Agent.JobStatus) |
-                | Smoke Tests | $(Agent.JobStatus) |
-
-                ## Notes
-                This is an auto-generated report from the Azure Deploy Customer Pipeline.
-                EOF
-                cat $(Build.ArtifactStagingDirectory)/report/deployment-report.md
-
-          - task: PublishPipelineArtifact@1
-            displayName: 'Publish Report'
-            inputs:
-              targetPath: '$(Build.ArtifactStagingDirectory)/report'
-              artifact: 'deployment-report'
-              publishLocation: 'pipeline'
-
-      - job: PublishResults
-        displayName: 'Publish Test Results'
-        pool:
-          vmImage: 'ubuntu-latest'
-        steps:
-          - task: Bash@3
-            displayName: 'Publish Results'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                echo "Publishing test results..."
-                echo "Placeholder: Would publish JUnit XML results to Azure DevOps"
-                echo "Results publishing completed"
-
-      - job: NotifyStakeholders
-        displayName: 'Notify Stakeholders'
-        pool:
-          vmImage: 'ubuntu-latest'
-        steps:
-          - task: Bash@3
-            displayName: 'Send Notifications'
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                echo "Sending notifications..."
-                echo "Placeholder: Would send notifications via:"
-                echo "  - Email"
-                echo "  - Teams webhook"
-                echo "  - Slack webhook"
-                echo ""
-                echo "Deployment ${{ parameters.operation }} for ${{ parameters.customer_id }} completed."
-                echo "Notifications sent (placeholder)"
+name: Azure Deploy Customer
+
+on:
+  workflow_dispatch:
+    inputs:
+      customer_id:
+        description: 'Customer ID (e.g., contoso, fabrikam)'
+        required: true
+        type: string
+      environment:
+        description: 'Environment'
+        required: true
+        type: choice
+        options:
+          - lab
+          - dev
+          - staging
+          - production
+        default: lab
+      service_tier:
+        description: 'Service Tier'
+        required: true
+        type: choice
+        options:
+          - economy
+          - standard
+          - enterprise
+        default: economy
+      region_class:
+        description: 'Region Class'
+        required: true
+        type: choice
+        options:
+          - primary
+          - secondary
+          - dr
+        default: primary
+      scep_enabled:
+        description: 'Enable SCEP Protocol'
+        required: false
+        type: boolean
+        default: false
+      acme_enabled:
+        description: 'Enable ACME Protocol'
+        required: false
+        type: boolean
+        default: false
+      external_ca:
+        description: 'External CA Provider'
+        required: true
+        type: choice
+        options:
+          - none
+          - letsencrypt
+          - digicert
+          - sectigo
+          - globalsign
+          - entrust
+          - godaddy
+          - custom
+        default: none
+      monitoring_enabled:
+        description: 'Enable Monitoring Stack'
+        required: false
+        type: boolean
+        default: true
+      operation:
+        description: 'Operation'
+        required: true
+        type: choice
+        options:
+          - deploy
+          - plan
+          - destroy
+        default: deploy
+
+env:
+  TF_VERSION: '1.10.0'
+  TF_WORKING_DIR: 'infra/terraform/azure'
+  EXPECTED_RESOURCES_ECONOMY: 10
+  EXPECTED_RESOURCES_STANDARD: 48
+  EXPECTED_RESOURCES_ENTERPRISE: 81
+  MAX_RETRIES: 2
+  RETRY_DELAY_SECONDS: 30
+
+# =============================================================================
+# JOB 1: VALIDATE
+# =============================================================================
+jobs:
+  validate:
+    name: 'Validate Configuration'
+    runs-on: ubuntu-latest
+    outputs:
+      validation_status: ${{ steps.validate.outputs.status }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Customer ID Format
+        id: validate-customer
+        run: |
+          set -e
+          CUSTOMER_ID='${{ github.event.inputs.customer_id }}'
+          if [ -z "$CUSTOMER_ID" ]; then
+            echo "::error::Customer ID is required"
+            exit 1
+          fi
+          if ! [[ "$CUSTOMER_ID" =~ ^[a-z0-9][a-z0-9-]*[a-z0-9]$ ]]; then
+            echo "::error::Customer ID must be lowercase alphanumeric with hyphens"
+            exit 1
+          fi
+          echo "Customer ID '$CUSTOMER_ID' is valid"
+          echo "status=valid" >> $GITHUB_OUTPUT
+
+      - name: Validate Environment and Tier Combination
+        run: |
+          set -e
+          ENV='${{ github.event.inputs.environment }}'
+          TIER='${{ github.event.inputs.service_tier }}'
+          echo "Validating environment=$ENV, tier=$TIER"
+          if [ "$ENV" = "production" ] && [ "$TIER" = "economy" ]; then
+            echo "::error::Production environment requires standard or enterprise tier"
+            exit 1
+          fi
+          echo "Environment/tier combination is valid"
+
+      - name: Azure Login
+        id: azure-login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+        continue-on-error: true
+
+      - name: Validate Azure Credentials (CLI)
+        id: validate-azure-cli
+        if: steps.azure-login.outcome == 'success'
+        run: |
+          set -e
+          echo "Validating Azure credentials..."
+          az account show --query '{subscription:id, tenant:tenantId, name:name}' -o table
+          echo "Azure credentials validated"
+
+      - name: Validate Azure Credentials (Fallback)
+        id: validate-azure-fallback
+        if: steps.azure-login.outcome == 'failure'
+        run: |
+          set -e
+          echo "::warning::Azure CLI login failed, attempting fallback validation..."
+          # Fallback: Check if ARM environment variables are set
+          if [ -z "$ARM_CLIENT_ID" ] || [ -z "$ARM_CLIENT_SECRET" ] || [ -z "$ARM_SUBSCRIPTION_ID" ] || [ -z "$ARM_TENANT_ID" ]; then
+            echo "::error::Azure authentication failed - no valid credentials found"
+            exit 1
+          fi
+          echo "Azure credentials validated via environment variables"
+        env:
+          ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+
+      - name: Validate Terraform Configuration Schema
+        run: |
+          set -e
+          echo "Validating Terraform configuration schema..."
+          cd ${{ env.TF_WORKING_DIR }}
+          for f in main.tf variables.tf outputs.tf versions.tf; do
+            if [ ! -f "$f" ]; then
+              echo "::error::Missing required file: $f"
+              exit 1
+            fi
+          done
+          echo "Schema validation passed"
+
+      - name: Validate Variable Constraints
+        run: |
+          set -e
+          TIER='${{ github.event.inputs.service_tier }}'
+          REGION='${{ github.event.inputs.region_class }}'
+          echo "Validating variable constraints for tier=$TIER, region_class=$REGION"
+          case "$REGION" in
+            primary|secondary|dr)
+              echo "Region class '$REGION' is valid"
+              ;;
+            *)
+              echo "::error::Invalid region class: $REGION"
+              exit 1
+              ;;
+          esac
+
+      - name: Validate External CA Credentials
+        if: github.event.inputs.external_ca != 'none'
+        run: |
+          set -e
+          EXT_CA='${{ github.event.inputs.external_ca }}'
+          echo "External CA provider: $EXT_CA"
+          echo "::notice::External CA credential validation is a placeholder."
+          echo "In production, this would validate API keys/certificates for $EXT_CA."
+          echo "Required credentials for $EXT_CA would be validated here"
+
+      - name: Validate Cost Guardrails
+        run: |
+          set -e
+          TIER='${{ github.event.inputs.service_tier }}'
+          echo "Checking cost guardrails for tier: $TIER"
+          case "$TIER" in
+            economy)
+              MAX_VMS=2
+              MAX_PUBLIC_IPS=1
+              MAX_NAT_GW=0
+              MAX_MANAGED_K8S=0
+              ;;
+            standard)
+              MAX_VMS=5
+              MAX_PUBLIC_IPS=2
+              MAX_NAT_GW=0
+              MAX_MANAGED_K8S=0
+              ;;
+            enterprise)
+              MAX_VMS=10
+              MAX_PUBLIC_IPS=4
+              MAX_NAT_GW=1
+              MAX_MANAGED_K8S=0
+              ;;
+          esac
+          echo "Tier limits: VMs<=$MAX_VMS, PublicIPs<=$MAX_PUBLIC_IPS, NATGW<=$MAX_NAT_GW"
+          echo "Cost guardrails validated"
+
+      - name: Set Validation Output
+        id: validate
+        run: echo "status=success" >> $GITHUB_OUTPUT
+
+# =============================================================================
+# JOB 2: PLAN
+# =============================================================================
+  plan:
+    name: 'Terraform Plan'
+    needs: validate
+    runs-on: ubuntu-latest
+    outputs:
+      plan_exit_code: ${{ steps.plan.outputs.exit_code }}
+      plan_has_changes: ${{ steps.plan.outputs.has_changes }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Configure Backend
+        run: |
+          set -e
+          cd ${{ env.TF_WORKING_DIR }}
+          echo "Using local state backend (remote state not yet configured)"
+          terraform init -input=false
+
+      - name: Generate Terraform Variables
+        run: |
+          set -e
+          cd ${{ env.TF_WORKING_DIR }}
+          cat > terraform.tfvars <<EOF
+          # Auto-generated by GitHub Actions
+          service_tier = "${{ github.event.inputs.service_tier }}"
+          environment = "${{ github.event.inputs.environment }}"
+          azure_region = "eastus"
+          project_name = "pki-${{ github.event.inputs.customer_id }}"
+          owner = "github-actions"
+          managed_by = "github-actions"
+          ephemeral = true
+          cost_center = "${{ github.event.inputs.customer_id }}"
+          EOF
+          cat terraform.tfvars
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          set -e
+          cd ${{ env.TF_WORKING_DIR }}
+          echo "Running Terraform plan..."
+          terraform plan -out=tfplan -detailed-exitcode 2>&1 | tee plan.log
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No changes required"
+          elif [ $EXIT_CODE -eq 2 ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Changes planned successfully"
+          else
+            echo "::error::Terraform plan failed with exit code $EXIT_CODE"
+            exit $EXIT_CODE
+          fi
+
+      - name: Resource Count Validation
+        run: |
+          set -e
+          cd ${{ env.TF_WORKING_DIR }}
+          TIER='${{ github.event.inputs.service_tier }}'
+          case "$TIER" in
+            economy) EXPECTED=${{ env.EXPECTED_RESOURCES_ECONOMY }} ;;
+            standard) EXPECTED=${{ env.EXPECTED_RESOURCES_STANDARD }} ;;
+            enterprise) EXPECTED=${{ env.EXPECTED_RESOURCES_ENTERPRISE }} ;;
+          esac
+          echo "Expected resources for $TIER tier: $EXPECTED"
+          if [ -f plan.log ]; then
+            PLANNED=$(grep -c "Plan:" plan.log || echo "0")
+            echo "Resources planned: $PLANNED"
+            echo "::notice::Resource count validation passed (placeholder)"
+          else
+            echo "::warning::No plan log found, skipping count validation"
+          fi
+
+      - name: Cost Estimate
+        run: |
+          set -e
+          TIER='${{ github.event.inputs.service_tier }}'
+          echo "Estimating costs for tier: $TIER"
+          case "$TIER" in
+            economy)
+              echo "Estimated monthly cost: ~\$33 USD"
+              echo "  - 1x Standard_B2s VM"
+              echo "  - Basic networking"
+              ;;
+            standard)
+              echo "Estimated monthly cost: ~\$200 USD"
+              echo "  - 3x VMs"
+              echo "  - Azure Database for PostgreSQL"
+              echo "  - Load Balancer"
+              ;;
+            enterprise)
+              echo "Estimated monthly cost: ~\$1000 USD"
+              echo "  - 6x VMs (multi-zone)"
+              echo "  - HA Database"
+              echo "  - Key Vault"
+              echo "  - Monitoring stack"
+              ;;
+          esac
+          echo "Cost estimate completed"
+
+      - name: Security Scan Placeholder
+        run: |
+          set -e
+          echo "Security scanning placeholder"
+          echo "In production, this would run:"
+          echo "  - tfsec (Terraform security scanner)"
+          echo "  - checkov (Policy-as-code scanner)"
+          echo "  - terrascan (Compliance scanner)"
+          echo ""
+          echo "Example: tfsec ${{ env.TF_WORKING_DIR }} --format json > tfsec-results.json"
+          echo "Security scan placeholder completed"
+
+      - name: Upload Plan Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: ${{ env.TF_WORKING_DIR }}/tfplan
+          retention-days: 7
+        if: always()
+
+      - name: Upload Plan Log
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan-log
+          path: ${{ env.TF_WORKING_DIR }}/plan.log
+          retention-days: 7
+        if: always()
+
+# =============================================================================
+# JOB 3: APPROVAL
+# =============================================================================
+  approval:
+    name: 'Manual Approval'
+    needs: plan
+    runs-on: ubuntu-latest
+    if: github.event.inputs.operation == 'deploy'
+    environment:
+      name: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Approval Checkpoint
+        run: |
+          echo "Deployment approved for ${{ github.event.inputs.customer_id }}"
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Tier: ${{ github.event.inputs.service_tier }}"
+          echo "Operation: ${{ github.event.inputs.operation }}"
+
+      - name: Cost Approval Check
+        if: github.event.inputs.service_tier == 'enterprise'
+        run: |
+          echo "::notice::Enterprise tier deployment - cost approval required"
+          echo "Estimated monthly cost: ~\$1000 USD"
+
+      - name: Security Approval Check
+        if: github.event.inputs.environment == 'production' || github.event.inputs.external_ca != 'none'
+        run: |
+          echo "::notice::Security review required for this deployment"
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "External CA: ${{ github.event.inputs.external_ca }}"
+
+# =============================================================================
+# JOB 4: DEPLOY INFRASTRUCTURE
+# =============================================================================
+  deploy-infrastructure:
+    name: 'Deploy Infrastructure'
+    needs: approval
+    runs-on: ubuntu-latest
+    if: github.event.inputs.operation == 'deploy' || github.event.inputs.operation == 'destroy'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Initialize Terraform
+        run: |
+          set -e
+          cd ${{ env.TF_WORKING_DIR }}
+          terraform init -input=false
+
+      - name: Download Plan Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan
+          path: ${{ env.TF_WORKING_DIR }}
+        continue-on-error: true
+
+      - name: Regenerate Plan if Needed
+        run: |
+          set -e
+          cd ${{ env.TF_WORKING_DIR }}
+          if [ ! -f tfplan ]; then
+            echo "Regenerating plan..."
+            terraform plan -out=tfplan
+          fi
+
+      - name: Terraform Apply
+        id: apply
+        run: |
+          set -e
+          cd ${{ env.TF_WORKING_DIR }}
+          OPERATION='${{ github.event.inputs.operation }}'
+          if [ "$OPERATION" = "destroy" ]; then
+            echo "Running Terraform destroy..."
+            terraform destroy -auto-approve
+          else
+            echo "Running Terraform apply..."
+            terraform apply -auto-approve tfplan
+          fi
+          echo "Terraform $OPERATION completed"
+
+      - name: Terraform Apply (Fallback)
+        id: apply-fallback
+        if: steps.apply.outcome == 'failure'
+        run: |
+          set -e
+          cd ${{ env.TF_WORKING_DIR }}
+          echo "::warning::Primary apply failed, attempting fallback..."
+          OPERATION='${{ github.event.inputs.operation }}'
+          if [ "$OPERATION" = "destroy" ]; then
+            terraform destroy -auto-approve
+          else
+            terraform apply -auto-approve tfplan
+          fi
+        env:
+          ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+
+      - name: Wait for K3s Ready
+        run: |
+          set -e
+          echo "Waiting for K3s to be ready..."
+          echo "::notice::This is a placeholder for K3s readiness check."
+          echo "In production, this would:"
+          echo "  1. Get VM IP from Terraform output"
+          echo "  2. SSH to VM and check k3s status"
+          echo "  3. Wait for node to be Ready"
+          echo "  4. Verify all system pods are running"
+          sleep 10
+          echo "K3s readiness check completed (placeholder)"
+
+      - name: Verify Resources
+        run: |
+          set -e
+          cd ${{ env.TF_WORKING_DIR }}
+          echo "Verifying deployed resources..."
+          terraform output -json > outputs.json
+          cat outputs.json | jq '.'
+          echo "Resource verification completed"
+
+      - name: Capture State Outputs
+        run: |
+          set -e
+          cd ${{ env.TF_WORKING_DIR }}
+          echo "Capturing Terraform state outputs..."
+          terraform output -json > terraform-outputs.json
+          echo "State outputs saved"
+
+      - name: Upload State Outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-outputs
+          path: ${{ env.TF_WORKING_DIR }}/terraform-outputs.json
+          retention-days: 30
+
+# =============================================================================
+# JOB 5: DEPLOY PLATFORM
+# =============================================================================
+  deploy-platform:
+    name: 'Deploy Platform'
+    needs: deploy-infrastructure
+    runs-on: ubuntu-latest
+    if: github.event.inputs.operation == 'deploy'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install kubectl
+        run: |
+          set -e
+          if ! command -v kubectl &> /dev/null; then
+            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+            chmod +x kubectl
+            sudo mv kubectl /usr/local/bin/
+          fi
+          kubectl version --client
+
+      - name: Configure kubeconfig
+        run: |
+          set -e
+          echo "Configuring kubeconfig..."
+          echo "::notice::This is a placeholder for kubeconfig setup."
+          echo "In production, this would:"
+          echo "  1. Get K3s kubeconfig from VM or Terraform output"
+          echo "  2. Configure kubectl to use it"
+          echo "  3. Verify cluster connectivity"
+          mkdir -p ~/.kube
+          echo "kubeconfig placeholder" > ~/.kube/config
+
+      - name: Argo CD Sync
+        run: |
+          set -e
+          echo "Syncing Argo CD applications..."
+          echo "::notice::This is a placeholder for Argo CD sync."
+          echo "In production, this would:"
+          echo "  1. Port-forward to Argo CD server"
+          echo "  2. Login to Argo CD"
+          echo "  3. Sync all applications"
+          echo "  4. Wait for sync to complete"
+          sleep 5
+          echo "Argo CD sync completed (placeholder)"
+
+      - name: Wait for Apps Synced
+        run: |
+          set -e
+          echo "Waiting for applications to sync..."
+          echo "::notice::Placeholder: Would check Argo CD app status"
+          sleep 5
+          echo "Applications synced (placeholder)"
+
+      - name: Verify Pods
+        run: |
+          set -e
+          echo "Verifying pod status..."
+          echo "::notice::Placeholder: Would check pod status with kubectl"
+          echo "Pod verification completed (placeholder)"
+
+      - name: Configure External CA
+        if: github.event.inputs.external_ca != 'none'
+        run: |
+          set -e
+          EXT_CA='${{ github.event.inputs.external_ca }}'
+          echo "Configuring External CA: $EXT_CA"
+          echo "::notice::This is a placeholder for external CA configuration."
+          echo "In production, this would:"
+          echo "  1. Deploy external CA gateway"
+          echo "  2. Configure cert-manager issuer"
+          echo "  3. Test certificate issuance"
+          echo "External CA configuration completed (placeholder)"
+
+# =============================================================================
+# JOB 6: SMOKE TESTS
+# =============================================================================
+  smoke-tests:
+    name: 'Smoke Tests'
+    needs: deploy-platform
+    runs-on: ubuntu-latest
+    if: github.event.inputs.operation == 'deploy'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Static Validation
+        run: |
+          set -e
+          echo "Running static validation..."
+          echo "::notice::Placeholder: Would validate Terraform state consistency"
+          echo "Static validation completed"
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Infrastructure Tests
+        run: |
+          set -e
+          echo "Verifying Azure resources..."
+          echo "::notice::Placeholder: Would verify:"
+          echo "  - Resource group exists"
+          echo "  - VMs are running"
+          echo "  - Network is configured"
+          echo "  - NSG rules are correct"
+          echo "Infrastructure tests completed (placeholder)"
+
+      - name: Kubernetes Tests
+        run: |
+          set -e
+          echo "Testing Kubernetes cluster..."
+          echo "::notice::Placeholder: Would test:"
+          echo "  - Node status"
+          echo "  - Pod status"
+          echo "  - Service endpoints"
+          echo "  - Ingress controllers"
+          echo "Kubernetes tests completed (placeholder)"
+
+      - name: Platform Tests
+        run: |
+          set -e
+          echo "Testing platform services..."
+          echo "::notice::Placeholder: Would test:"
+          echo "  - Argo CD UI accessible"
+          echo "  - cert-manager running"
+          echo "  - OpenBao/Vault accessible"
+          echo "Platform tests completed (placeholder)"
+
+      - name: PKI Tests
+        run: |
+          set -e
+          SCEP='${{ github.event.inputs.scep_enabled }}'
+          ACME='${{ github.event.inputs.acme_enabled }}'
+          echo "Testing PKI functionality..."
+          echo "SCEP enabled: $SCEP"
+          echo "ACME enabled: $ACME"
+          echo "::notice::Placeholder: Would test:"
+          echo "  - CA certificate issuance"
+          if [ "$SCEP" = "true" ]; then
+            echo "  - SCEP enrollment"
+          fi
+          if [ "$ACME" = "true" ]; then
+            echo "  - ACME certificate issuance"
+          fi
+          echo "PKI tests completed (placeholder)"
+
+      - name: Monitoring Tests
+        if: github.event.inputs.monitoring_enabled == 'true'
+        run: |
+          set -e
+          echo "Testing monitoring stack..."
+          echo "::notice::Placeholder: Would test:"
+          echo "  - Prometheus metrics"
+          echo "  - Grafana dashboards"
+          echo "  - Alertmanager configuration"
+          echo "Monitoring tests completed (placeholder)"
+
+      - name: External CA Tests
+        if: github.event.inputs.external_ca != 'none'
+        run: |
+          set -e
+          EXT_CA='${{ github.event.inputs.external_ca }}'
+          echo "Testing External CA integration: $EXT_CA"
+          echo "::notice::Placeholder: Would test:"
+          echo "  - Connectivity to $EXT_CA API"
+          echo "  - Certificate issuance via $EXT_CA"
+          echo "  - Chain validation"
+          echo "External CA tests completed (placeholder)"
+
+# =============================================================================
+# JOB 7: REPORT
+# =============================================================================
+  report:
+    name: 'Generate Report'
+    needs: [validate, plan, approval, deploy-infrastructure, deploy-platform, smoke-tests]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate Report
+        run: |
+          set -e
+          mkdir -p report
+          cat > report/deployment-report.md <<EOF
+          # Deployment Report
+
+          ## Summary
+          - **Customer:** ${{ github.event.inputs.customer_id }}
+          - **Environment:** ${{ github.event.inputs.environment }}
+          - **Service Tier:** ${{ github.event.inputs.service_tier }}
+          - **Region Class:** ${{ github.event.inputs.region_class }}
+          - **Operation:** ${{ github.event.inputs.operation }}
+          - **Timestamp:** $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          ## Configuration
+          - **SCEP Enabled:** ${{ github.event.inputs.scep_enabled }}
+          - **ACME Enabled:** ${{ github.event.inputs.acme_enabled }}
+          - **External CA:** ${{ github.event.inputs.external_ca }}
+          - **Monitoring Enabled:** ${{ github.event.inputs.monitoring_enabled }}
+
+          ## Pipeline Status
+          - **Run ID:** ${{ github.run_id }}
+          - **Run Number:** ${{ github.run_number }}
+          - **Ref:** ${{ github.ref }}
+          - **SHA:** ${{ github.sha }}
+
+          ## Jobs
+          | Job | Status |
+          |-----|--------|
+          | Validate | ${{ needs.validate.result }} |
+          | Plan | ${{ needs.plan.result }} |
+          | Approval | ${{ needs.approval.result }} |
+          | Deploy Infrastructure | ${{ needs.deploy-infrastructure.result }} |
+          | Deploy Platform | ${{ needs.deploy-platform.result }} |
+          | Smoke Tests | ${{ needs.smoke-tests.result }} |
+
+          ## Notes
+          This is an auto-generated report from the Azure Deploy Customer GitHub Actions workflow.
+          EOF
+          cat report/deployment-report.md
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-report
+          path: report/
+          retention-days: 90
+
+      - name: Publish Results
+        run: |
+          set -e
+          echo "Publishing test results..."
+          echo "::notice::Placeholder: Would publish JUnit XML results"
+          echo "Results publishing completed"
+
+      - name: Notify Stakeholders
+        run: |
+          set -e
+          echo "Sending notifications..."
+          echo "::notice::Placeholder: Would send notifications via:"
+          echo "  - Email"
+          echo "  - Teams webhook"
+          echo "  - Slack webhook"
+          echo ""
+          echo "Deployment ${{ github.event.inputs.operation }} for ${{ github.event.inputs.customer_id }} completed."
+          echo "Notifications sent (placeholder)"

@@ -1,0 +1,146 @@
+# External CA gateway — containerized base deployment.
+# Cloud-neutral; provider overlays set image, env, and credentials.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: external-ca-gateway
+  namespace: pki
+  labels:
+    app.kubernetes.io/name: external-ca-gateway
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: external-ca-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: external-ca-gateway
+        app.kubernetes.io/part-of: machine-identity-platform
+    spec:
+      serviceAccountName: external-ca-gateway
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+        - name: gateway
+          image: registry/external-ca-gateway:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: metrics
+              containerPort: 9090
+          env:
+            - name: LOG_LEVEL
+              value: info
+            - name: CA_PROVIDER
+              valueFrom:
+                configMapKeyRef:
+                  name: external-ca-gateway-config
+                  key: provider
+          envFrom:
+            - secretRef:
+                name: external-ca-gateway-credentials
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-ca-gateway
+  namespace: pki
+  labels:
+    app.kubernetes.io/name: external-ca-gateway
+spec:
+  selector:
+    app.kubernetes.io/name: external-ca-gateway
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: external-ca-gateway
+  namespace: pki
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: external-ca-gateway
+  namespace: pki
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: external-ca-gateway
+  policyTypes: [Ingress, Egress]
+  ingress:
+    # Allow from cert-api / cert-worker and Prometheus scraping.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cert-api
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cert-worker
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 8080
+        - port: 9090
+  egress:
+    # DNS + HTTPS to external CA endpoints only.
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 53
+          protocol: UDP
+    - ports:
+        - port: 443
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: external-ca-gateway
+  namespace: monitoring
+  labels:
+    monitoring.pki.platform.io/enabled: "true"
+    app.kubernetes.io/part-of: machine-identity-platform
+    component: external-ca
+spec:
+  namespaceSelector:
+    matchNames: [pki]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: external-ca-gateway
+  endpoints:
+    - port: metrics
+      interval: 30s

@@ -1,0 +1,32 @@
+# External CA gateway Argo CD Application (containerized, DigiCert example).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-ca-gateway-digicert
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    app.kubernetes.io/name: external-ca-gateway
+    app.kubernetes.io/part-of: machine-identity-platform
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/AdamKnight02/homelab-gitops.git
+    targetRevision: main
+    path: gitops/external-ca-gateway/overlays/containerized/digicert
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pki
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

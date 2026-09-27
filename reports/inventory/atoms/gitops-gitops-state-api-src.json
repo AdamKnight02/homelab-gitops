@@ -1,0 +1,9 @@
+{
+  "path": "gitops/state-api/src/",
+  "file_count": 10,
+  "filetypes": [".py", ".txt"],
+  "entrypoints": [
+    "gitops/state-api/src/app/main.py"
+  ],
+  "notes": []
+}

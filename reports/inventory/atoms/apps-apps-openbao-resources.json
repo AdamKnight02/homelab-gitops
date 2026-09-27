@@ -1,0 +1,7 @@
+{
+  "path": "apps/openbao/resources",
+  "file_count": 6,
+  "filetypes": [".yaml", ".hcl"],
+  "entrypoints": [],
+  "notes": []
+}

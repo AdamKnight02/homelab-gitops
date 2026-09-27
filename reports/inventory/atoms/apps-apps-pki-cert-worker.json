@@ -1,0 +1,1 @@
+{"path":"apps/pki/cert-worker","file_count":22,"filetypes":["yaml","py","txt","md","Dockerfile"],"entrypoints":["kustomization.yaml","deployment.yaml","main.py"],"notes":[]}

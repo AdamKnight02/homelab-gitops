@@ -73,7 +73,7 @@ on:
           - destroy
 
 env:
-  TF_VERSION: '1.9.0'
+  TF_VERSION: '1.10.5'
   AWS_REGION: 'us-east-1'
   TF_DIR: 'infra/terraform/aws'
 

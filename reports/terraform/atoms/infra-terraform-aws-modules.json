@@ -1,0 +1,57 @@
+{
+  "root": "/workspace/homelab-gitops/infra/terraform/aws",
+  "check": "module sources in .tf files",
+  "status": "complete",
+  "findings": [
+    {
+      "module": "tier_config",
+      "source": "../modules/aws/tier-config",
+      "exists": true
+    },
+    {
+      "module": "network",
+      "source": "../modules/aws/network",
+      "exists": true
+    },
+    {
+      "module": "security",
+      "source": "../modules/aws/security",
+      "exists": true
+    },
+    {
+      "module": "secrets",
+      "source": "../modules/aws/secrets",
+      "exists": true
+    },
+    {
+      "module": "storage",
+      "source": "../modules/aws/storage",
+      "exists": true
+    },
+    {
+      "module": "identity",
+      "source": "../modules/aws/identity",
+      "exists": true
+    },
+    {
+      "module": "database",
+      "source": "../modules/aws/database",
+      "exists": true
+    },
+    {
+      "module": "kubernetes_bootstrap",
+      "source": "../modules/aws/kubernetes-bootstrap",
+      "exists": true
+    },
+    {
+      "module": "compute",
+      "source": "../modules/aws/compute",
+      "exists": true
+    },
+    {
+      "module": "load_balancer",
+      "source": "../modules/aws/load-balancer",
+      "exists": true
+    }
+  ]
+}

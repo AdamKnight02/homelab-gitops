@@ -1,0 +1,1 @@
+{"script":"tests/level2-cloud/test_cloud_infrastructure.py","compile_exit":0,"errors":[],"purpose":"Level 2 tests validating Azure/AWS cloud infrastructure (CLI auth, resource groups/VPCs, VMs/EC2, NSG/SG rules, public IPs, EBS encryption) via cloud CLIs."}

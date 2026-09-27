@@ -1,0 +1,13 @@
+{
+  "path": "pipelines/",
+  "file_count": 4,
+  "filetypes": [
+    "yml",
+    "yaml"
+  ],
+  "entrypoints": [],
+  "notes": [
+    "Directory contains 4 pipeline files in aws/ and azure/ subdirectories",
+    "No files matching kustomization.yaml, application.yaml, main.tf, or Chart.yaml found"
+  ]
+}

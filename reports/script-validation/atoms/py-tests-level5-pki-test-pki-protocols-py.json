@@ -1,0 +1,1 @@
+{"script":"tests/level5-pki/test_pki_protocols.py","compile_exit":0,"errors":[],"purpose":"Level 5 PKI protocol tests (needs kubectl and EJBCA)"}

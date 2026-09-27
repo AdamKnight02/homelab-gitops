@@ -1,0 +1,7 @@
+{
+  "path": "bootstrap",
+  "file_count": 1,
+  "filetypes": ["yaml"],
+  "entrypoints": ["bootstrap/root-app.yaml"],
+  "notes": []
+}

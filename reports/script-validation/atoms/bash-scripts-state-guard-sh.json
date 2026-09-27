@@ -1,0 +1,1 @@
+{"script":"scripts/state-guard.sh","bash_n_exit":0,"errors":[],"purpose":"Terraform State Safety Guard — validates before plan/apply/destroy/import/migration."}

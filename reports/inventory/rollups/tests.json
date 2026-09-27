@@ -1,0 +1,108 @@
+{
+  "group": "tests",
+  "directories": [
+    {
+      "path": "homelab-gitops/tests/level1-static",
+      "file_count": 2,
+      "filetypes": [
+        "py"
+      ],
+      "entrypoints": [],
+      "notes": []
+    },
+    {
+      "path": "tests/level2-cloud",
+      "file_count": 2,
+      "filetypes": [
+        ".py"
+      ],
+      "entrypoints": [],
+      "notes": []
+    },
+    {
+      "path": "tests/level3-kubernetes",
+      "file_count": 2,
+      "filetypes": [
+        ".py"
+      ],
+      "entrypoints": [
+        "tests/level3-kubernetes/test_kubernetes.py"
+      ],
+      "notes": []
+    },
+    {
+      "path": "homelab-gitops/tests/level4-platform",
+      "file_count": 2,
+      "filetypes": [
+        "py"
+      ],
+      "entrypoints": [],
+      "notes": []
+    },
+    {
+      "path": "tests/level5-pki",
+      "file_count": 2,
+      "filetypes": [
+        ".py"
+      ],
+      "entrypoints": [],
+      "notes": []
+    },
+    {
+      "path": "tests/level6-idempotency/",
+      "file_count": 2,
+      "filetypes": [
+        ".py"
+      ],
+      "entrypoints": [],
+      "notes": [
+        "Contains __init__.py and test_idempotency.py only",
+        "No kustomization.yaml, application.yaml, main.tf, Chart.yaml, or similar entrypoint files present; test_idempotency.py is the runnable test module (has __main__ block)"
+      ]
+    },
+    {
+      "path": "homelab-gitops/tests/level7-lifecycle",
+      "file_count": 2,
+      "filetypes": [
+        "py"
+      ],
+      "entrypoints": [
+        "homelab-gitops/tests/level7-lifecycle/test_lifecycle.py"
+      ],
+      "notes": []
+    },
+    {
+      "path": "tests/lib",
+      "file_count": 2,
+      "filetypes": [
+        ".py"
+      ],
+      "entrypoints": [],
+      "notes": [
+        "no entrypoint files present"
+      ]
+    },
+    {
+      "path": "tests/config",
+      "file_count": 2,
+      "filetypes": [
+        "yaml"
+      ],
+      "entrypoints": [
+        "external-ca-test-config.yaml",
+        "test-config.yaml"
+      ],
+      "notes": []
+    },
+    {
+      "path": "tests/matrix",
+      "file_count": 5,
+      "filetypes": [
+        ".py"
+      ],
+      "entrypoints": [],
+      "notes": []
+    }
+  ],
+  "total_files": 23
+}

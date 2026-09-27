@@ -42,6 +42,8 @@ provider "aws" {
   # Region configured via var.aws_region or AWS_DEFAULT_REGION
   # Credentials via environment variables, shared credentials, or IAM role
 
+  region = var.aws_region
+
   default_tags {
     tags = {
       Project     = var.project_name

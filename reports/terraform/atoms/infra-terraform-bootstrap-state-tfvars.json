@@ -1,0 +1,52 @@
+{
+  "root": "infra/terraform/bootstrap/state",
+  "check": "variable_name_consistency",
+  "status": "completed",
+  "findings": [
+    {
+      "type": "defined_but_unused",
+      "variable_name": "project_name",
+      "description": "Variable defined in variables.tf but not used in any tfvars files"
+    },
+    {
+      "type": "defined_but_unused",
+      "variable_name": "environment",
+      "description": "Variable defined in variables.tf but not used in any tfvars files"
+    },
+    {
+      "type": "defined_but_unused",
+      "variable_name": "name_prefix",
+      "description": "Variable defined in variables.tf but not used in any tfvars files"
+    },
+    {
+      "type": "defined_but_unused",
+      "variable_name": "azure_region",
+      "description": "Variable defined in variables.tf but not used in any tfvars files"
+    },
+    {
+      "type": "defined_but_unused",
+      "variable_name": "storage_replication_type",
+      "description": "Variable defined in variables.tf but not used in any tfvars files"
+    },
+    {
+      "type": "defined_but_unused",
+      "variable_name": "soft_delete_retention_days",
+      "description": "Variable defined in variables.tf but not used in any tfvars files"
+    },
+    {
+      "type": "defined_but_unused",
+      "variable_name": "allowed_ip_ranges",
+      "description": "Variable defined in variables.tf but not used in any tfvars files"
+    },
+    {
+      "type": "defined_but_unused",
+      "variable_name": "allowed_subnet_ids",
+      "description": "Variable defined in variables.tf but not used in any tfvars files"
+    },
+    {
+      "type": "defined_but_unused",
+      "variable_name": "terraform_sp_object_id",
+      "description": "Variable defined in variables.tf but not used in any tfvars files"
+    }
+  ]
+}

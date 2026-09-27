@@ -1,0 +1,7 @@
+{
+  "path": "apps/overlays/aws",
+  "file_count": 1,
+  "filetypes": [".yaml"],
+  "entrypoints": ["apps/overlays/aws/kustomization.yaml"],
+  "notes": []
+}

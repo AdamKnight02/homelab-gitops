@@ -1,0 +1,1 @@
+{"root":"infra/terraform/alibaba","check":"terraform fmt -check -recursive","status":"passed","findings":[]}

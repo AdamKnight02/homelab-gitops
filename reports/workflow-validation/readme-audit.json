@@ -1,0 +1,64 @@
+{
+  "matches": [
+    {
+      "workflow": "validate.yml",
+      "description": "Schema, format, lint, security checks"
+    },
+    {
+      "workflow": "terraform-plan.yml",
+      "description": "Plan + security scan + cost estimate"
+    },
+    {
+      "workflow": "terraform-apply.yml",
+      "description": "Apply with approval gate"
+    },
+    {
+      "workflow": "destroy.yml",
+      "description": "Teardown with double approval"
+    },
+    {
+      "workflow": "deploy-customer.yml",
+      "description": "Full orchestrator pipeline"
+    },
+    {
+      "workflow": "argo-sync-check.yaml",
+      "description": "ArgoCD sync checker workflow"
+    },
+    {
+      "workflow": "pki-validation.yaml",
+      "description": "PKI manifest validation workflow"
+    }
+  ],
+  "drift": [
+    {
+      "claim": "aws-deploy-addon.yml",
+      "workflow": "aws-deploy-addon.yml",
+      "type": "missing",
+      "description": "AWS addon deployment workflow"
+    },
+    {
+      "claim": "azure-deploy-addon.yml",
+      "workflow": "azure-deploy-addon.yml",
+      "type": "missing",
+      "description": "Azure addon deployment workflow"
+    },
+    {
+      "claim": "deploy-aws-lab.yml",
+      "workflow": "deploy-aws-lab.yml",
+      "type": "missing",
+      "description": "AWS lab deployment workflow"
+    },
+    {
+      "claim": "aws-deploy-customer.yml",
+      "workflow": "aws-deploy-customer.yml",
+      "type": "missing",
+      "description": "AWS customer deployment workflow"
+    },
+    {
+      "claim": "azure-deploy-customer.yml",
+      "workflow": "azure-deploy-customer.yml",
+      "type": "missing",
+      "description": "Azure customer deployment workflow"
+    }
+  ]
+}

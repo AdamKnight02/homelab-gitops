@@ -1,0 +1,1 @@
+{"root":"homelab-gitops/infra/terraform/aws","check":"backend block in providers.tf","status":"complete","findings":[{"file":"homelab-gitops/infra/terraform/aws/providers.tf","type":"s3","key":"aws/terraform.tfstate","commented":false,"present":true}]}

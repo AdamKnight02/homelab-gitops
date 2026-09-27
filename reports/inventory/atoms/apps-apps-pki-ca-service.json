@@ -1,0 +1,20 @@
+{
+  "path": "apps/pki/ca-service",
+  "file_count": 18,
+  "filetypes": [
+    "Dockerfile",
+    "md",
+    "py",
+    "txt",
+    "yaml"
+  ],
+  "entrypoints": [
+    "homelab-gitops/apps/pki/ca-service/kustomization.yaml"
+  ],
+  "notes": [
+    "Directory apps/pki/ca-service found at homelab-gitops/apps/pki/ca-service",
+    "Total file count: 18",
+    "File types: Dockerfile, md, py, txt, yaml",
+    "Entrypoint found: kustomization.yaml"
+  ]
+}

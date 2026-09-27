@@ -1,0 +1,32 @@
+{
+  "root": "/workspace/homelab-gitops/infra/terraform/aws",
+  "check": "terraform_lockfile",
+  "status": "present",
+  "findings": [
+    {
+      "provider": "aws",
+      "version": "5.100.0",
+      "constraints": "~> 5.0"
+    },
+    {
+      "provider": "cloudinit",
+      "version": "2.4.0",
+      "constraints": "~> 2.3"
+    },
+    {
+      "provider": "local",
+      "version": "2.9.0",
+      "constraints": "~> 2.5"
+    },
+    {
+      "provider": "random",
+      "version": "3.9.0",
+      "constraints": "~> 3.6"
+    },
+    {
+      "provider": "tls",
+      "version": "4.4.0",
+      "constraints": "~> 4.0"
+    }
+  ]
+}

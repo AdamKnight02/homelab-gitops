@@ -1,0 +1,40 @@
+{
+ "check": "stray-root-artifacts",
+ "findings": [
+  {
+   "severity": "INFO",
+   "file": "INVENTORY-REPORT.md",
+   "problem": "stray root artifact: status/report dump"
+  },
+  {
+   "severity": "INFO",
+   "file": "PHASE5-6-SUMMARY.md",
+   "problem": "stray root artifact: status/report dump"
+  },
+  {
+   "severity": "INFO",
+   "file": "PHASES-8-24-EXECUTION-REPORT.md",
+   "problem": "stray root artifact: status/report dump"
+  },
+  {
+   "severity": "INFO",
+   "file": "SESSION-STATE.md",
+   "problem": "stray root artifact: status/report dump"
+  },
+  {
+   "severity": "INFO",
+   "file": "convert_to_pdf.py",
+   "problem": "stray root artifact: one-off utility script"
+  },
+  {
+   "severity": "INFO",
+   "file": "openclaw-workspace-state.json",
+   "problem": "stray root artifact: agent session/state file"
+  },
+  {
+   "severity": "INFO",
+   "file": "test-flush-status.txt",
+   "problem": "stray root artifact: test/scratch file"
+  }
+ ]
+}

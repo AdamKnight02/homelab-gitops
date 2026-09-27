@@ -1,0 +1,62 @@
+{
+  "root": "/workspace/homelab-gitops",
+  "check": "infra/terraform/alibaba",
+  "status": "complete",
+  "findings": [
+    {
+      "file": "main.tf",
+      "source": "../modules/alibaba/tier-config",
+      "exists": true
+    },
+    {
+      "file": "main.tf",
+      "source": "../modules/alibaba/network",
+      "exists": true
+    },
+    {
+      "file": "main.tf",
+      "source": "../modules/alibaba/security",
+      "exists": true
+    },
+    {
+      "file": "main.tf",
+      "source": "../modules/alibaba/identity",
+      "exists": true
+    },
+    {
+      "file": "main.tf",
+      "source": "../modules/alibaba/secrets",
+      "exists": true
+    },
+    {
+      "file": "main.tf",
+      "source": "../modules/alibaba/storage",
+      "exists": true
+    },
+    {
+      "file": "main.tf",
+      "source": "../modules/alibaba/database",
+      "exists": true
+    },
+    {
+      "file": "main.tf",
+      "source": "../modules/alibaba/kubernetes-bootstrap",
+      "exists": true
+    },
+    {
+      "file": "main.tf",
+      "source": "../modules/alibaba/compute",
+      "exists": true
+    },
+    {
+      "file": "main.tf",
+      "source": "../modules/alibaba/load-balancer",
+      "exists": true
+    },
+    {
+      "file": "main.tf",
+      "source": "../modules/alibaba/monitoring-bootstrap",
+      "exists": true
+    }
+  ]
+}

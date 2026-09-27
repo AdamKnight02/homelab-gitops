@@ -1,0 +1,1 @@
+{"script":"tests/level4-platform/test_platform.py","compile_exit":0,"errors":[],"purpose":"Level 4 platform health tests (needs kubectl and a running platform)"}

@@ -1,0 +1,7 @@
+{
+  "path": "apps/cert-manager",
+  "file_count": 4,
+  "filetypes": [".yaml"],
+  "entrypoints": ["apps/cert-manager/application.yaml"],
+  "notes": []
+}

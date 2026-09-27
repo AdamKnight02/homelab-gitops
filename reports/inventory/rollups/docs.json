@@ -1,0 +1,125 @@
+{
+  "group": "docs",
+  "directories": [
+    {
+      "path": "docs/alibaba",
+      "file_count": 3,
+      "filetypes": [
+        "md"
+      ],
+      "entrypoints": [],
+      "notes": [
+        "Directory contains documentation files for Alibaba Cloud infrastructure",
+        "Includes architecture overview, deployment guide, and tier definitions"
+      ]
+    },
+    {
+      "path": "homelab-gitops/docs/architecture",
+      "file_count": 21,
+      "filetypes": [
+        "md"
+      ],
+      "entrypoints": [],
+      "notes": []
+    },
+    {
+      "path": "docs/aws",
+      "file_count": 3,
+      "filetypes": [
+        "md"
+      ],
+      "entrypoints": [],
+      "notes": [
+        "3 markdown docs; no IaC entrypoint files"
+      ]
+    },
+    {
+      "path": "docs/azure",
+      "file_count": 2,
+      "filetypes": [
+        ".md"
+      ],
+      "entrypoints": [],
+      "notes": []
+    },
+    {
+      "path": "docs/cloud",
+      "file_count": 31,
+      "filetypes": [
+        "md",
+        "yaml"
+      ],
+      "entrypoints": [
+        "manifests/base/kustomization.yaml",
+        "manifests/overlays/aws/kustomization.yaml",
+        "manifests/overlays/azure/kustomization.yaml",
+        "manifests/overlays/homelab/kustomization.yaml"
+      ],
+      "notes": [
+        "Directory contains 31 files including markdown documentation and kustomization files for Kubernetes manifests",
+        "Entry point files are kustomization.yaml files used for Kubernetes GitOps deployments"
+      ]
+    },
+    {
+      "path": "docs/cost/",
+      "file_count": 1,
+      "filetypes": [
+        ".md"
+      ],
+      "entrypoints": [],
+      "notes": [
+        "Single markdown file: cost-review.md; no kustomization.yaml, application.yaml, main.tf, Chart.yaml or other entrypoint files present"
+      ]
+    },
+    {
+      "path": "docs/migration",
+      "file_count": 4,
+      "filetypes": [
+        "md"
+      ],
+      "entrypoints": [],
+      "notes": []
+    },
+    {
+      "path": "docs/monitoring",
+      "file_count": 2,
+      "filetypes": [
+        ".md"
+      ],
+      "entrypoints": [],
+      "notes": []
+    },
+    {
+      "path": "docs/operations/",
+      "file_count": 2,
+      "filetypes": [
+        ".md"
+      ],
+      "entrypoints": [],
+      "notes": []
+    },
+    {
+      "path": "docs/security",
+      "file_count": 1,
+      "filetypes": [
+        ".md"
+      ],
+      "entrypoints": [],
+      "notes": [
+        "./homelab-gitops/docs/security/security-review.md"
+      ]
+    },
+    {
+      "path": "docs/testing/",
+      "file_count": 2,
+      "filetypes": [
+        ".md"
+      ],
+      "entrypoints": [],
+      "notes": [
+        "contains lifecycle-tests.md and provider-test-matrix.md; no kustomization.yaml/application.yaml/main.tf/Chart.yaml entrypoints present"
+      ]
+    }
+  ],
+  "total_files": 72
+}

@@ -1,0 +1,6 @@
+{
+  "script": "tests/level3-kubernetes/test_kubernetes.py",
+  "compile_exit": 0,
+  "errors": [],
+  "purpose": "Syntax-check Kubernetes tests for level 3"
+}

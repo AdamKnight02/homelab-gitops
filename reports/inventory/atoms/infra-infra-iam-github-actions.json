@@ -1,0 +1,11 @@
+{
+  "path": "homelab-gitops/infra/iam/github-actions",
+  "file_count": 2,
+  "filetypes": [
+    "json"
+  ],
+  "entrypoints": [],
+  "notes": [
+    "Directory contains IAM policy JSON documents for GitHub Actions OIDC; no IaC entrypoint files."
+  ]
+}

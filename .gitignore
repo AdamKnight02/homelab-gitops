@@ -1,1 +1,13 @@
 .work/
+
+# Local Terraform metadata and state
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/backend.hcl
+**/crash.log
+**/crash.*.log
+
+# Python artifacts
+__pycache__/
+*.py[cod]

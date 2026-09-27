@@ -1,0 +1,1 @@
+{"path":"infra/terraform/aws","file_count":12,"filetypes":["example","hcl","md","tf","tfvars","tpl","yaml"],"entrypoints":["main.tf"],"notes":[]}

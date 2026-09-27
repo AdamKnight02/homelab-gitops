@@ -1,0 +1,1 @@
+{"path":"gitops/external-ca-gateway/base","file_count":2,"filetypes":["yaml"],"entrypoints":["gitops/external-ca-gateway/base/kustomization.yaml"],"notes":[]}

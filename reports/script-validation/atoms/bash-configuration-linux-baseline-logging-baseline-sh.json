@@ -1,0 +1,1 @@
+{"script":"./homelab-gitops/configuration/linux/baseline/logging-baseline.sh","bash_n_exit":0,"errors":[],"purpose":"Linux Logging Baseline for PKI Platform - Configures centralized logging and log forwarding"}

@@ -1,0 +1,18 @@
+{
+  "path": "docs/cloud",
+  "file_count": 31,
+  "filetypes": [
+    "md",
+    "yaml"
+  ],
+  "entrypoints": [
+    "manifests/base/kustomization.yaml",
+    "manifests/overlays/aws/kustomization.yaml",
+    "manifests/overlays/azure/kustomization.yaml",
+    "manifests/overlays/homelab/kustomization.yaml"
+  ],
+  "notes": [
+    "Directory contains 31 files including markdown documentation and kustomization files for Kubernetes manifests",
+    "Entry point files are kustomization.yaml files used for Kubernetes GitOps deployments"
+  ]
+}

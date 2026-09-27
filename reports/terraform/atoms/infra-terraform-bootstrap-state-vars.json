@@ -1,0 +1,6 @@
+{
+  "root": "homelab-gitops/infra/terraform/bootstrap/state",
+  "check": "terraform-variables",
+  "status": "success",
+  "findings": []
+}

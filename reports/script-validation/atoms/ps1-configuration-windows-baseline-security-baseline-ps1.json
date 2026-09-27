@@ -1,0 +1,7 @@
+{
+  "script": "configuration/windows/baseline/security-baseline.ps1",
+  "balance_ok": true,
+  "issues": [],
+  "secret_patterns": [],
+  "purpose": "Applies foundational security hardening to Windows Server VMs in the PKI platform. Covers account policies, audit policies, Windows Defender, firewall, and SMB hardening."
+}

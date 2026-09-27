@@ -1,0 +1,166 @@
+{
+  "group": "infra",
+  "directories": [
+    {
+      "path": "homelab-gitops/infra/iam/github-actions",
+      "file_count": 2,
+      "filetypes": [
+        "json"
+      ],
+      "entrypoints": [],
+      "notes": [
+        "Directory contains IAM policy JSON documents for GitHub Actions OIDC; no IaC entrypoint files."
+      ]
+    },
+    {
+      "path": "infra/terraform/aws",
+      "file_count": 12,
+      "filetypes": [
+        "example",
+        "hcl",
+        "md",
+        "tf",
+        "tfvars",
+        "tpl",
+        "yaml"
+      ],
+      "entrypoints": [
+        "main.tf"
+      ],
+      "notes": []
+    },
+    {
+      "path": "infra/terraform/azure",
+      "file_count": 2,
+      "filetypes": [
+        ".md",
+        ".hcl"
+      ],
+      "entrypoints": [],
+      "notes": [
+        "Directory infra/terraform/azure exists with .terraform.lock.hcl and README.md files",
+        "No main.tf or other entrypoint files found in the directory"
+      ]
+    },
+    {
+      "path": "infra/terraform/alibaba/",
+      "file_count": 9,
+      "filetypes": [".tf", ".md", ".hcl", ".tpl", ".example"],
+      "entrypoints": [
+        "infra/terraform/alibaba/main.tf",
+        "infra/terraform/alibaba/variables.tf",
+        "infra/terraform/alibaba/locals.tf",
+        "infra/terraform/alibaba/outputs.tf",
+        "infra/terraform/alibaba/versions.tf"
+      ],
+      "notes": [
+        "Directory path is relative to workspace root.",
+        "Entry points include main.tf, variables.tf, locals.tf, outputs.tf, and versions.tf.",
+        "Template file cloud-init.yaml.tpl is present but not considered an entry point.",
+        "The .terraform.lock.hcl file is a generated file and not counted as a source file.",
+        "The terraform.tfvars.example is an example file, not an entrypoint."
+      ]
+    },
+    {
+      "path": "infra/terraform/bootstrap/state",
+      "file_count": 5,
+      "filetypes": [
+        "md",
+        "tf"
+      ],
+      "entrypoints": [
+        "main.tf",
+        "outputs.tf",
+        "variables.tf"
+      ],
+      "notes": []
+    },
+    {
+      "path": "infra/terraform/modules/aws",
+      "file_count": 14,
+      "filetypes": [
+        "tf"
+      ],
+      "entrypoints": [
+        "infra/terraform/modules/aws/network.tf",
+        "infra/terraform/modules/aws/tier-config.tf"
+      ],
+      "notes": []
+    },
+    {
+      "path": "infra/terraform/modules/azure",
+      "file_count": 81,
+      "filetypes": [
+        "tf",
+        "tpl"
+      ],
+      "entrypoints": [
+        "infra/terraform/modules/azure/acme/main.tf",
+        "infra/terraform/modules/azure/automation/main.tf",
+        "infra/terraform/modules/azure/compute/main.tf",
+        "infra/terraform/modules/azure/database/main.tf",
+        "infra/terraform/modules/azure/gateway/main.tf",
+        "infra/terraform/modules/azure/identity/main.tf",
+        "infra/terraform/modules/azure/keyvault/main.tf",
+        "infra/terraform/modules/azure/kubernetes-bootstrap/main.tf",
+        "infra/terraform/modules/azure/load-balancer/main.tf",
+        "infra/terraform/modules/azure/monitoring-bootstrap/main.tf",
+        "infra/terraform/modules/azure/network/main.tf",
+        "infra/terraform/modules/azure/pki-vm/main.tf",
+        "infra/terraform/modules/azure/postgresql/main.tf",
+        "infra/terraform/modules/azure/resource-group/main.tf",
+        "infra/terraform/modules/azure/scep/main.tf",
+        "infra/terraform/modules/azure/secrets/main.tf",
+        "infra/terraform/modules/azure/security/main.tf",
+        "infra/terraform/modules/azure/storage/main.tf",
+        "infra/terraform/modules/azure/vm/main.tf"
+      ],
+      "notes": [
+        "Directory infra/terraform/modules/azure exists and contains 81 files."
+      ]
+    },
+    {
+      "path": "infra/terraform/modules/alibaba",
+      "file_count": 55,
+      "filetypes": [
+        "tf",
+        "tpl",
+        "hcl"
+      ],
+      "entrypoints": [
+        "infra/terraform/modules/alibaba/compute/main.tf",
+        "infra/terraform/modules/alibaba/database/main.tf",
+        "infra/terraform/modules/alibaba/identity/main.tf",
+        "infra/terraform/modules/alibaba/kubernetes-bootstrap/main.tf",
+        "infra/terraform/modules/alibaba/load-balancer/main.tf",
+        "infra/terraform/modules/alibaba/monitoring-bootstrap/main.tf",
+        "infra/terraform/modules/alibaba/network/main.tf",
+        "infra/terraform/modules/alibaba/secrets/main.tf",
+        "infra/terraform/modules/alibaba/security/main.tf",
+        "infra/terraform/modules/alibaba/storage/main.tf",
+        "infra/terraform/modules/alibaba/tier-config/main.tf"
+      ],
+      "notes": []
+    },
+    {
+      "path": "infra/terraform/modules/shared",
+      "file_count": 18,
+      "filetypes": [
+        ".tf"
+      ],
+      "entrypoints": [
+        "infra/terraform/modules/shared/contracts/main.tf",
+        "infra/terraform/modules/shared/naming/main.tf",
+        "infra/terraform/modules/shared/tagging/main.tf",
+        "infra/terraform/modules/shared/variables.tf",
+        "infra/terraform/modules/shared/versions.tf"
+      ],
+      "notes": [
+        "Directory exists at homelab-gitops/infra/terraform/modules/shared",
+        "Contains 18 Terraform files (.tf extension)",
+        "Entry points identified: main.tf files in contracts, naming, tagging modules and root module files"
+      ]
+    }
+  ],
+  "total_files": 198
+}

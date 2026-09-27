@@ -1,0 +1,15 @@
+{
+ "check": "disabled-manifests",
+ "findings": [
+  {
+   "severity": "INFO",
+   "file": "apps/pki/kyverno-policies.yaml.disabled",
+   "problem": "disabled-suffix file (*.disabled)"
+  },
+  {
+   "severity": "INFO",
+   "file": "apps/pki/podsecuritypolicy.yaml.disabled",
+   "problem": "disabled-suffix file (*.disabled)"
+  }
+ ]
+}

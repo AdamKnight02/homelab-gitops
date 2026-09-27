@@ -1,0 +1,1 @@
+{"workflow":"validate.yml","triggers":["workflow_dispatch","workflow_call","push","pull_request"],"jobs":["terraform-fmt","terraform-validate","yaml-lint","k8s-validate","schema-validate","secrets-scan","validation-summary"],"action_refs":["actions/checkout@v4","hashicorp/setup-terraform@v3","azure/setup-kubectl@v4"],"script_refs":[],"findings":[]}

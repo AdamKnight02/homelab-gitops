@@ -1,0 +1,73 @@
+{
+  "root": "homelab-gitops/infra/terraform/azure",
+  "check": "module source validation",
+  "status": "complete",
+  "findings": [
+    {
+      "module_name": "tier_config",
+      "source": "../modules/azure",
+      "exists": true,
+      "path": "homelab-gitops/infra/terraform/modules/azure"
+    },
+    {
+      "module_name": "network",
+      "source": "../modules/azure/network",
+      "exists": true,
+      "path": "homelab-gitops/infra/terraform/modules/azure/network"
+    },
+    {
+      "module_name": "security",
+      "source": "../modules/azure/security",
+      "exists": true,
+      "path": "homelab-gitops/infra/terraform/modules/azure/security"
+    },
+    {
+      "module_name": "kubernetes_bootstrap",
+      "source": "../modules/azure/kubernetes-bootstrap",
+      "exists": true,
+      "path": "homelab-gitops/infra/terraform/modules/azure/kubernetes-bootstrap"
+    },
+    {
+      "module_name": "compute",
+      "source": "../modules/azure/compute",
+      "exists": true,
+      "path": "homelab-gitops/infra/terraform/modules/azure/compute"
+    },
+    {
+      "module_name": "identity",
+      "source": "../modules/azure/identity",
+      "exists": true,
+      "path": "homelab-gitops/infra/terraform/modules/azure/identity"
+    },
+    {
+      "module_name": "load_balancer",
+      "source": "../modules/azure/load-balancer",
+      "exists": true,
+      "path": "homelab-gitops/infra/terraform/modules/azure/load-balancer"
+    },
+    {
+      "module_name": "database",
+      "source": "../modules/azure/database",
+      "exists": true,
+      "path": "homelab-gitops/infra/terraform/modules/azure/database"
+    },
+    {
+      "module_name": "storage",
+      "source": "../modules/azure/storage",
+      "exists": true,
+      "path": "homelab-gitops/infra/terraform/modules/azure/storage"
+    },
+    {
+      "module_name": "secrets",
+      "source": "../modules/azure/secrets",
+      "exists": true,
+      "path": "homelab-gitops/infra/terraform/modules/azure/secrets"
+    },
+    {
+      "module_name": "monitoring",
+      "source": "../modules/azure/monitoring-bootstrap",
+      "exists": true,
+      "path": "homelab-gitops/infra/terraform/modules/azure/monitoring-bootstrap"
+    }
+  ]
+}

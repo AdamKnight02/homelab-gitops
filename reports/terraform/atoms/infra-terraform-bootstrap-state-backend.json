@@ -1,0 +1,16 @@
+{
+  "root": "/workspace/homelab-gitops/infra/terraform/bootstrap/state",
+  "check": "terraform backend configuration",
+  "status": "analyzed",
+  "findings": [
+    {
+      "file": "backend.tf",
+      "type": "local",
+      "key_fields": [
+        "path"
+      ],
+      "commented_out": false,
+      "description": "Current backend is configured as 'local' with path = 'terraform.tfstate'. This is for initial bootstrap before migrating to remote state."
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+{"group":"scripts","directories":[{"path":"scripts","file_count":2,"filetypes":["sh"],"entrypoints":["scripts/migration-orchestrator.sh","scripts/state-backup.sh"],"notes":[]}],"total_files":2}

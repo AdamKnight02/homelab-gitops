@@ -1,0 +1,186 @@
+{
+  "workflow": ".github/workflows/azure-deploy-customer.yml",
+  "triggers": [
+    "workflow_dispatch"
+  ],
+  "jobs": [
+    {
+      "name": "Validate Configuration",
+      "id": "validate",
+      "runs-on": "ubuntu-latest",
+      "outputs": {
+        "validation_status": "${{ steps.validate.outputs.status }}"
+      }
+    },
+    {
+      "name": "Terraform Plan",
+      "id": "plan",
+      "needs": [
+        "validate"
+      ],
+      "runs-on": "ubuntu-latest",
+      "outputs": {
+        "plan_exit_code": "${{ steps.plan.outputs.exit_code }}",
+        "plan_has_changes": "${{ steps.plan.outputs.has_changes }}"
+      }
+    },
+    {
+      "name": "Manual Approval",
+      "id": "approval",
+      "needs": [
+        "plan"
+      ],
+      "runs-on": "ubuntu-latest",
+      "if": "github.event.inputs.operation == 'deploy'",
+      "environment": {
+        "name": "${{ github.event.inputs.environment }}"
+      }
+    },
+    {
+      "name": "Deploy Infrastructure",
+      "id": "deploy-infrastructure",
+      "needs": [
+        "approval"
+      ],
+      "runs-on": "ubuntu-latest",
+      "if": "github.event.inputs.operation == 'deploy' || github.event.inputs.operation == 'destroy'"
+    },
+    {
+      "name": "Deploy Platform",
+      "id": "deploy-platform",
+      "needs": [
+        "deploy-infrastructure"
+      ],
+      "runs-on": "ubuntu-latest",
+      "if": "github.event.inputs.operation == 'deploy'"
+    },
+    {
+      "name": "Smoke Tests",
+      "id": "smoke-tests",
+      "needs": [
+        "deploy-platform"
+      ],
+      "runs-on": "ubuntu-latest",
+      "if": "github.event.inputs.operation == 'deploy'"
+    },
+    {
+      "name": "Generate Report",
+      "id": "report",
+      "needs": [
+        "validate",
+        "plan",
+        "approval",
+        "deploy-infrastructure",
+        "deploy-platform",
+        "smoke-tests"
+      ],
+      "runs-on": "ubuntu-latest",
+      "if": "always()"
+    }
+  ],
+  "action_refs": [
+    {
+      "name": "actions/checkout",
+      "version": "v4"
+    },
+    {
+      "name": "azure/login",
+      "version": "v2"
+    },
+    {
+      "name": "hashicorp/setup-terraform",
+      "version": "v3"
+    },
+    {
+      "name": "actions/upload-artifact",
+      "version": "v4"
+    },
+    {
+      "name": "actions/download-artifact",
+      "version": "v4"
+    }
+  ],
+  "script_refs": [
+    {
+      "path": ".github/scripts/init-azure-backend.sh",
+      "exists": false
+    }
+  ],
+  "findings": [
+    {
+      "type": "incomplete_implementation",
+      "message": "In job 'deploy-platform', the 'Configure kubeconfig' step has a placeholder comment and no actual implementation.",
+      "file": ".github/workflows/azure-deploy-customer.yml"
+    },
+    {
+      "type": "incomplete_implementation",
+      "message": "In job 'deploy-platform', the 'Argo CD Sync' step has a placeholder comment and no actual implementation.",
+      "file": ".github/workflows/azure-deploy-customer.yml"
+    },
+    {
+      "type": "incomplete_implementation",
+      "message": "In job 'deploy-platform', the 'Wait for Apps Synced' step has a placeholder comment and no actual implementation.",
+      "file": ".github/workflows/azure-deploy-customer.yml"
+    },
+    {
+      "type": "incomplete_implementation",
+      "message": "In job 'deploy-platform', the 'Verify Pods' step has a placeholder comment and no actual implementation.",
+      "file": ".github/workflows/azure-deploy-customer.yml"
+    },
+    {
+      "type": "incomplete_implementation",
+      "message": "In job 'deploy-platform', the 'Configure External CA' step has a placeholder comment and no actual implementation.",
+      "file": ".github/workflows/azure-deploy-customer.yml"
+    },
+    {
+      "type": "incomplete_implementation",
+      "message": "In job 'smoke-tests', the 'Static Validation' step has a placeholder comment and no actual implementation.",
+      "file": ".github/workflows/azure-deploy-customer.yml"
+    },
+    {
+      "type": "incomplete_implementation",
+      "message": "In job 'smoke-tests', the 'Infrastructure Tests' step has a placeholder comment and no actual implementation.",
+      "file": ".github/workflows/azure-deploy-customer.yml"
+    },
+    {
+      "type": "incomplete_implementation",
+      "message": "In job 'smoke-tests', the 'Kubernetes Tests' step has a placeholder comment and no actual implementation.",
+      "file": ".github/workflows/azure-deploy-customer.yml"
+    },
+    {
+      "type": "incomplete_implementation",
+      "message": "In job 'smoke-tests', the 'Platform Tests' step has a placeholder comment and no actual implementation.",
+      "file": ".github/workflows/azure-deploy-customer.yml"
+    },
+    {
+      "type": "incomplete_implementation",
+      "message": "In job 'smoke-tests', the 'PKI Tests' step has a placeholder comment and no actual implementation.",
+      "file": ".github/workflows/azure-deploy-customer.yml"
+    },
+    {
+      "type": "incomplete_implementation",
+      "message": "In job 'smoke-tests', the 'Monitoring Tests' step has a placeholder comment and no actual implementation.",
+      "file": ".github/workflows/azure-deploy-customer.yml"
+    },
+    {
+      "type": "incomplete_implementation",
+      "message": "In job 'smoke-tests', the 'External CA Tests' step has a placeholder comment and no actual implementation.",
+      "file": ".github/workflows/azure-deploy-customer.yml"
+    },
+    {
+      "type": "incomplete_implementation",
+      "message": "In job 'report', the 'Publish Results' step has a placeholder comment and no actual implementation.",
+      "file": ".github/workflows/azure-deploy-customer.yml"
+    },
+    {
+      "type": "incomplete_implementation",
+      "message": "In job 'report', the 'Notify Stakeholders' step has a placeholder comment and no actual implementation.",
+      "file": ".github/workflows/azure-deploy-customer.yml"
+    },
+    {
+      "type": "secret_usage",
+      "message": "Secrets used: AZURE_CREDENTIALS, ARM_CLIENT_ID, ARM_CLIENT_SECRET, ARM_SUBSCRIPTION_ID, ARM_TENANT_ID",
+      "file": ".github/workflows/azure-deploy-customer.yml"
+    }
+  ]
+}

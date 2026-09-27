@@ -1,0 +1,17 @@
+{
+  "path": "rabbitmq-demo",
+  "file_count": 5,
+  "filetypes": [
+    "md",
+    "py",
+    "yaml"
+  ],
+  "entrypoints": [
+    "rabbitmq-demo/k8s-deployment.yaml"
+  ],
+  "notes": [
+    "Directory rabbitmq-demo found at /workspace/homelab-gitops/rabbitmq-demo",
+    "Contains Dockerfile (no extension), README.md (.md), producer.py (.py), consumer.py (.py), k8s-deployment.yaml (.yaml)",
+    "Entry point identified: k8s-deployment.yaml"
+  ]
+}

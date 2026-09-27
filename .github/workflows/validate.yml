@@ -38,7 +38,7 @@ on:
       - 'configuration/**'
 
 env:
-  TF_VERSION: '1.9.8'
+  TF_VERSION: '1.10.5'
 
 permissions:
   id-token: write

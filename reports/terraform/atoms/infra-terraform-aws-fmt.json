@@ -1,0 +1,1 @@
+{"root":"infra/terraform/aws","check":"fmt -check -recursive","status":"pass","findings":[]}

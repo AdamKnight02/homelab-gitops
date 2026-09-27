@@ -1,0 +1,123 @@
+{
+  "root": "infra/terraform/alibaba",
+  "check": "tfvars",
+  "status": "completed",
+  "findings": [
+    {
+      "type": "defined-but-unused",
+      "variable": "alibaba_instance_type_override"
+    },
+    {
+      "type": "defined-but-unused",
+      "variable": "alibaba_zone_id"
+    },
+    {
+      "type": "defined-but-unused",
+      "variable": "alibaba_create_ram_role"
+    },
+    {
+      "type": "defined-but-unused",
+      "variable": "alibaba_ssh_public_key"
+    },
+    {
+      "type": "defined-but-unused",
+      "variable": "alibaba_root_volume_category"
+    },
+    {
+      "type": "defined-but-unused",
+      "variable": "alibaba_root_volume_size"
+    },
+    {
+      "type": "defined-but-unused",
+      "variable": "alibaba_vpc_cidr"
+    },
+    {
+      "type": "defined-but-unused",
+      "variable": "alibaba_subnet_cidr"
+    },
+    {
+      "type": "defined-but-unused",
+      "variable": "alibaba_associate_public_ip"
+    },
+    {
+      "type": "defined-but-unused",
+      "variable": "alibaba_internet_max_bandwidth_out"
+    },
+    {
+      "type": "defined-but-unused",
+      "variable": "alibaba_region"
+    },
+    {
+      "type": "defined-but-unused",
+      "variable": "alibaba_admin_username"
+    },
+    {
+      "type": "defined-but-unused",
+      "variable": "enable_ack"
+    },
+    {
+      "type": "used-but-undefined",
+      "variable": "allow_k8s_api_cidr"
+    },
+    {
+      "type": "used-but-undefined",
+      "variable": "instance_type"
+    },
+    {
+      "type": "used-but-undefined",
+      "variable": "instance_count"
+    },
+    {
+      "type": "used-but-undefined",
+      "variable": "system_disk_category"
+    },
+    {
+      "type": "used-but-undefined",
+      "variable": "system_disk_size"
+    },
+    {
+      "type": "used-but-undefined",
+      "variable": "create_rds"
+    },
+    {
+      "type": "used-but-undefined",
+      "variable": "rds_instance_type"
+    },
+    {
+      "type": "used-but-undefined",
+      "variable": "rds_ha_enabled"
+    },
+    {
+      "type": "used-but-undefined",
+      "variable": "create_oss"
+    },
+    {
+      "type": "used-but-undefined",
+      "variable": "oss_versioning"
+    },
+    {
+      "type": "used-but-undefined",
+      "variable": "create_slb"
+    },
+    {
+      "type": "used-but-undefined",
+      "variable": "slb_type"
+    },
+    {
+      "type": "used-but-undefined",
+      "variable": "create_kms_key"
+    },
+    {
+      "type": "used-but-undefined",
+      "variable": "create_ram_role"
+    },
+    {
+      "type": "used-but-undefined",
+      "variable": "enable_monitoring"
+    },
+    {
+      "type": "used-but-undefined",
+      "variable": "enable_cloudmonitor"
+    }
+  ]
+}

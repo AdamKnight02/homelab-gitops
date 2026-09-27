@@ -1,0 +1,114 @@
+{
+  "group": "other",
+  "directories": [
+    {
+      "path": "bootstrap",
+      "file_count": 1,
+      "filetypes": [
+        "yaml"
+      ],
+      "entrypoints": [
+        "bootstrap/root-app.yaml"
+      ],
+      "notes": []
+    },
+    {
+      "path": "customers/",
+      "file_count": 2,
+      "filetypes": [
+        ".yaml"
+      ],
+      "entrypoints": [],
+      "notes": []
+    },
+    {
+      "path": "pipelines/",
+      "file_count": 4,
+      "filetypes": [
+        "yml",
+        "yaml"
+      ],
+      "entrypoints": [],
+      "notes": [
+        "Directory contains 4 pipeline files in aws/ and azure/ subdirectories",
+        "No files matching kustomization.yaml, application.yaml, main.tf, or Chart.yaml found"
+      ]
+    },
+    {
+      "path": "homelab-gitops/infrastructure",
+      "file_count": 9,
+      "filetypes": [
+        ".service",
+        ".sh",
+        ".yaml"
+      ],
+      "entrypoints": [
+        "homelab-gitops/infrastructure/k3s-pod-watcher/kustomization.yaml",
+        "homelab-gitops/infrastructure/registry/application.yaml",
+        "homelab-gitops/infrastructure/registry/kustomization.yaml"
+      ],
+      "notes": []
+    },
+    {
+      "path": "machine-identity-platform/",
+      "file_count": 0,
+      "filetypes": [],
+      "entrypoints": [],
+      "notes": [
+        "Directory machine-identity-platform/ does not exist."
+      ]
+    },
+    {
+      "path": "rabbitmq-demo",
+      "file_count": 5,
+      "filetypes": [
+        "md",
+        "py",
+        "yaml"
+      ],
+      "entrypoints": [
+        "rabbitmq-demo/k8s-deployment.yaml"
+      ],
+      "notes": [
+        "Directory rabbitmq-demo found at /workspace/homelab-gitops/rabbitmq-demo",
+        "Contains Dockerfile (no extension), README.md (.md), producer.py (.py), consumer.py (.py), k8s-deployment.yaml (.yaml)",
+        "Entry point identified: k8s-deployment.yaml"
+      ]
+    },
+    {
+      "path": "/home/frostnode/.openclaw/workspaces/qwen-worker/homelab-gitops",
+      "file_count": 17,
+      "filetypes": [
+        "md",
+        "py",
+        "json",
+        "txt",
+        "no_extension"
+      ],
+      "entrypoints": [
+        "README.md",
+        "AGENTS.md"
+      ],
+      "notes": [
+        "AGENTS.md",
+        "convert_to_pdf.py",
+        ".gitignore",
+        "HEARTBEAT.md",
+        "IDENTITY.md",
+        "INVENTORY-REPORT.md",
+        "openclaw-workspace-state.json",
+        "PHASE5-6-SUMMARY.md",
+        "PHASES-8-24-EXECUTION-REPORT.md",
+        "PKI-HOMELAB-MASTER-GUIDE.md",
+        "prometheus.json",
+        "README.md",
+        "SESSION-STATE.md",
+        "SOUL.md",
+        "test-flush-status.txt",
+        "TOOLS.md",
+        "USER.md"
+      ]
+    }
+  ],
+  "total_files": 38
+}

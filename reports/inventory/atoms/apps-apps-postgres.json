@@ -1,0 +1,7 @@
+{
+  "path": "apps/postgres",
+  "file_count": 2,
+  "filetypes": [".yaml"],
+  "entrypoints": ["apps/postgres/application.yaml"],
+  "notes": ["Directory is non-empty."]
+}

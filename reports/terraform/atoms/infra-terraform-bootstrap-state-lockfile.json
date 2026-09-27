@@ -1,0 +1,1 @@
+{"root":"infra/terraform/bootstrap/state","check":"terraform.lock.hcl","status":"missing","findings":[]}

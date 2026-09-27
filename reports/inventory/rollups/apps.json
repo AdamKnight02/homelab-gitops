@@ -1,0 +1,125 @@
+{
+  "group": "apps",
+  "directories": [
+    {
+      "path": "apps/base",
+      "file_count": 1,
+      "filetypes": [".yaml"],
+      "entrypoints": ["apps/base/kustomization.yaml"],
+      "notes": ["Directory apps/base is not empty; it contains kustomization.yaml."]
+    },
+    {
+      "path": "apps/cert-manager",
+      "file_count": 4,
+      "filetypes": [".yaml"],
+      "entrypoints": ["apps/cert-manager/application.yaml"],
+      "notes": []
+    },
+    {
+      "path": "apps/cert-manager/resources",
+      "file_count": 2,
+      "filetypes": [".yaml"],
+      "entrypoints": [],
+      "notes": ["Directory apps/cert-manager/resources exists."]
+    },
+    {
+      "path": "apps/ejbca",
+      "file_count": 2,
+      "filetypes": [".yaml"],
+      "entrypoints": ["apps/ejbca/application.yaml"],
+      "notes": []
+    },
+    {
+      "path": "apps/openbao",
+      "file_count": 9,
+      "filetypes": [".yaml", ".hcl"],
+      "entrypoints": ["apps/openbao/application.yaml", "apps/openbao/kustomization.yaml"],
+      "notes": []
+    },
+    {
+      "path": "apps/openbao/resources",
+      "file_count": 6,
+      "filetypes": [".yaml", ".hcl"],
+      "entrypoints": [],
+      "notes": []
+    },
+    {
+      "path": "apps/overlays/aws",
+      "file_count": 1,
+      "filetypes": [".yaml"],
+      "entrypoints": ["apps/overlays/aws/kustomization.yaml"],
+      "notes": []
+    },
+    {
+      "path": "apps/overlays/azure",
+      "file_count": 1,
+      "filetypes": ["yaml"],
+      "entrypoints": ["kustomization.yaml"],
+      "notes": []
+    },
+    {
+      "path": "apps/overlays/homelab",
+      "file_count": 1,
+      "filetypes": ["yaml"],
+      "entrypoints": ["apps/overlays/homelab/kustomization.yaml"],
+      "notes": []
+    },
+    {
+      "path": "apps/pki/ca-service",
+      "file_count": 18,
+      "filetypes": ["Dockerfile", "md", "py", "txt", "yaml"],
+      "entrypoints": ["homelab-gitops/apps/pki/ca-service/kustomization.yaml"],
+      "notes": ["Directory apps/pki/ca-service found at homelab-gitops/apps/pki/ca-service", "Total file count: 18", "File types: Dockerfile, md, py, txt, yaml", "Entrypoint found: kustomization.yaml"]
+    },
+    {
+      "path": "apps/pki/cert-api",
+      "file_count": 8,
+      "filetypes": [".md", ".yaml", ".py", ".txt", ""],
+      "entrypoints": ["kustomization.yaml"],
+      "notes": []
+    },
+    {
+      "path": "apps/pki/cert-worker",
+      "file_count": 22,
+      "filetypes": ["yaml","py","txt","md","Dockerfile"],
+      "entrypoints": ["kustomization.yaml","deployment.yaml","main.py"],
+      "notes": []
+    },
+    {
+      "path": "apps/pki/database",
+      "file_count": 2,
+      "filetypes": ["yaml"],
+      "entrypoints": ["apps/pki/database/kustomization.yaml"],
+      "notes": []
+    },
+    {
+      "path": "apps/pki/shared",
+      "file_count": 2,
+      "filetypes": ["py","sql"],
+      "entrypoints": [],
+      "notes": []
+    },
+    {
+      "path": "apps/postgres",
+      "file_count": 2,
+      "filetypes": [".yaml"],
+      "entrypoints": ["apps/postgres/application.yaml"],
+      "notes": ["Directory is non-empty."]
+    },
+    {
+      "path": "apps/rabbitmq",
+      "file_count": 6,
+      "filetypes": [".yaml"],
+      "entrypoints": ["apps/rabbitmq/application.yaml", "apps/rabbitmq/kustomization.yaml"],
+      "notes": ["Corrected file count from 5 to 6 based on actual directory listing; all 6 YAML files are present: application.yaml, kustomization.yaml, namespace.yaml, secret.yaml, service.yaml, statefulset.yaml"]
+    },
+    {
+      "path": "apps/spire",
+      "file_count": 15,
+      "filetypes": ["yaml"],
+      "entrypoints": ["apps/spire/application.yaml", "apps/spire/kustomization.yaml"],
+      "notes": []
+    }
+  ],
+  "total_files": 102
+}

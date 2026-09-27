@@ -1,0 +1,226 @@
+{
+  "group": "gitops",
+  "directories": [
+    {
+      "path": "gitops/applications",
+      "file_count": 1,
+      "filetypes": [
+        "yaml"
+      ],
+      "entrypoints": [
+        "customer-appset.yaml"
+      ],
+      "notes": []
+    },
+    {
+      "path": "gitops/bootstrap",
+      "file_count": 1,
+      "filetypes": [
+        "yaml"
+      ],
+      "entrypoints": [
+        "gitops/bootstrap/root-app.yaml"
+      ],
+      "notes": []
+    },
+    {
+      "path": "gitops/external-ca-gateway/base",
+      "file_count": 2,
+      "filetypes": [
+        "yaml"
+      ],
+      "entrypoints": [
+        "gitops/external-ca-gateway/base/kustomization.yaml"
+      ],
+      "notes": []
+    },
+    {
+      "path": "gitops/external-ca-gateway/overlays",
+      "file_count": 2,
+      "filetypes": [
+        "yaml"
+      ],
+      "entrypoints": [
+        "agent/kustomization.yaml"
+      ],
+      "notes": []
+    },
+    {
+      "path": "gitops/monitoring/argocd",
+      "file_count": 4,
+      "filetypes": [
+        ".yaml"
+      ],
+      "entrypoints": [
+        "gitops/monitoring/argocd/application-blackbox.yaml",
+        "gitops/monitoring/argocd/application-extras.yaml",
+        "gitops/monitoring/argocd/application.yaml",
+        "gitops/monitoring/argocd/applicationsets.yaml"
+      ],
+      "notes": [
+        "No kustomization.yaml, main.tf, or Chart.yaml found in the directory."
+      ]
+    },
+    {
+      "path": "gitops/monitoring/base",
+      "file_count": 35,
+      "filetypes": [
+        "yaml",
+        "json",
+        "py"
+      ],
+      "entrypoints": [
+        "gitops/monitoring/base/alert-rules/kustomization.yaml",
+        "gitops/monitoring/base/prometheus-stack/kustomization.yaml",
+        "gitops/monitoring/base/servicemonitors/kustomization.yaml",
+        "gitops/monitoring/base/grafana-dashboards/kustomization.yaml"
+      ],
+      "notes": [
+        "Directory contains alerting, exporter, dashboard, and service monitor configurations for PKI platform monitoring.",
+        "Entry points include kustomization files for various components.",
+        "File extensions include yaml, json, and py (Python scripts)."
+      ]
+    },
+    {
+      "path": "gitops/monitoring/customers",
+      "file_count": 2,
+      "filetypes": [
+        "md",
+        "yaml"
+      ],
+      "entrypoints": [],
+      "notes": [
+        "Directory contains only a README.md and a _template directory. No actual customer directories exist."
+      ]
+    },
+    {
+      "path": "gitops/monitoring/overlays",
+      "file_count": 2,
+      "filetypes": [
+        "yaml"
+      ],
+      "entrypoints": [],
+      "notes": []
+    },
+    {
+      "path": "homelab-gitops/gitops/monitoring/providers/",
+      "file_count": 3,
+      "filetypes": [
+        "yaml"
+      ],
+      "entrypoints": [],
+      "notes": []
+    },
+    {
+      "path": "gitops/projects/",
+      "file_count": 2,
+      "filetypes": [
+        ".yaml"
+      ],
+      "entrypoints": [],
+      "notes": [
+        "2 files: customer-template.yaml, pki-infrastructure.yaml; no kustomization.yaml/application.yaml/main.tf/Chart.yaml present; both are ArgoCD AppProject manifests"
+      ]
+    },
+    {
+      "path": "gitops/state-api/argocd",
+      "file_count": 1,
+      "filetypes": [
+        "yaml"
+      ],
+      "entrypoints": [
+        "application.yaml"
+      ],
+      "notes": []
+    },
+    {
+      "path": "gitops/state-api/base",
+      "file_count": 9,
+      "filetypes": [
+        ".yaml"
+      ],
+      "entrypoints": [
+        "gitops/state-api/base/kustomization.yaml"
+      ],
+      "notes": []
+    },
+    {
+      "path": "gitops/state-api/overlays/",
+      "file_count": 3,
+      "filetypes": [
+        "yaml"
+      ],
+      "entrypoints": [
+        "gitops/state-api/overlays/alibaba/kustomization.yaml",
+        "gitops/state-api/overlays/aws/kustomization.yaml",
+        "gitops/state-api/overlays/azure/kustomization.yaml"
+      ],
+      "notes": []
+    },
+    {
+      "path": "gitops/state-api/src/",
+      "file_count": 10,
+      "filetypes": [
+        ".py",
+        ".txt"
+      ],
+      "entrypoints": [
+        "gitops/state-api/src/app/main.py"
+      ],
+      "notes": []
+    },
+    {
+      "path": "gitops/state-ui/argocd",
+      "file_count": 1,
+      "filetypes": [
+        "yaml"
+      ],
+      "entrypoints": [
+        "application.yaml"
+      ],
+      "notes": []
+    },
+    {
+      "path": "gitops/state-ui/base/",
+      "file_count": 5,
+      "filetypes": [
+        "yaml"
+      ],
+      "entrypoints": [
+        "kustomization.yaml"
+      ],
+      "notes": []
+    },
+    {
+      "path": "gitops/state-ui/overlays/",
+      "file_count": 2,
+      "filetypes": [
+        ".yaml"
+      ],
+      "entrypoints": [
+        "homelab-gitops/gitops/state-ui/overlays/internal-ingress/kustomization.yaml"
+      ],
+      "notes": [
+        "Found 2 files: homelab-gitops/gitops/state-ui/overlays/internal-ingress/ingress.yaml and homelab-gitops/gitops/state-ui/overlays/internal-ingress/kustomization.yaml. Only kustomization.yaml is an entrypoint file."
+      ]
+    },
+    {
+      "path": "gitops/state-ui/src",
+      "file_count": 10,
+      "filetypes": [
+        "html",
+        "json",
+        "tsx",
+        "css",
+        "ts"
+      ],
+      "entrypoints": [
+        "index.html",
+        "package.json",
+        "main.tsx"
+      ],
+      "notes": []
+    }
+  ],
+  "total_files": 95
+}

@@ -1,0 +1,11 @@
+{
+  "path": "gitops/bootstrap",
+  "file_count": 1,
+  "filetypes": [
+    "yaml"
+  ],
+  "entrypoints": [
+    "gitops/bootstrap/root-app.yaml"
+  ],
+  "notes": []
+}

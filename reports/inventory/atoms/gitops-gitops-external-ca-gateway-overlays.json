@@ -1,0 +1,1 @@
+{"path":"gitops/external-ca-gateway/overlays","file_count":2,"filetypes":["yaml"],"entrypoints":["agent/kustomization.yaml"],"notes":[]}

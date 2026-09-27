@@ -1,0 +1,40 @@
+{
+  "workflow": ".github/workflows/azure-deploy-addon.yml",
+  "triggers": [
+    "workflow_dispatch"
+  ],
+  "jobs": [
+    "validate",
+    "plan",
+    "approval",
+    "deploy-addon",
+    "smoke-tests",
+    "report"
+  ],
+  "action_refs": [
+    "actions/checkout@v4",
+    "hashicorp/setup-terraform@v3",
+    "azure/login@v2",
+    "actions/upload-artifact@v4",
+    "actions/download-artifact@v4",
+    "azure/setup-kubectl@v4",
+    "azure/use-kubelogin@v1"
+  ],
+  "script_refs": [
+    {
+      "path": ".github/scripts/init-azure-backend.sh",
+      "exists": false
+    }
+  ],
+  "findings": [
+    "The workflow uses a local script '.github/scripts/init-azure-backend.sh' which does not exist in the repository",
+    "The workflow references secrets: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID",
+    "The workflow uses a variable 'AZURE_TFSTATE_RESOURCE_GROUP' which is referenced from GitHub vars but not defined in the workflow",
+    "The workflow uses a variable 'AZURE_TFSTATE_STORAGE_ACCOUNT' which is referenced from GitHub vars but not defined in the workflow",
+    "The workflow uses a variable 'AZURE_TFSTATE_CONTAINER' which is referenced from GitHub vars but not defined in the workflow",
+    "The workflow references 'gitops/external-ca-gateway/${PROVIDER}/' which could potentially be a non-existent directory structure",
+    "The workflow uses multiple kubectl commands that require a valid cluster connection",
+    "The workflow uses multiple terraform commands that require a valid backend configuration",
+    "The workflow has a hardcoded path 'infra/terraform/azure' for Terraform working directory"
+  ]
+}

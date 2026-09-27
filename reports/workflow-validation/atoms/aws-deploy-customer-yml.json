@@ -1,0 +1,51 @@
+{
+  "workflow": ".github/workflows/aws-deploy-customer.yml",
+  "triggers": [
+    "workflow_dispatch"
+  ],
+  "jobs": [
+    "validate",
+    "plan",
+    "approval",
+    "deploy-infrastructure",
+    "deploy-platform",
+    "smoke-tests",
+    "report"
+  ],
+  "action_refs": [
+    "actions/checkout@v4",
+    "aws-actions/configure-aws-credentials@v4",
+    "hashicorp/setup-terraform@v3",
+    "actions/upload-artifact@v4",
+    "actions/download-artifact@v4",
+    "azure/setup-kubectl@v4"
+  ],
+  "script_refs": [
+    {
+      "path": "tests/run_tests.py",
+      "exists": true
+    }
+  ],
+  "findings": [
+    {
+      "type": "security",
+      "message": "The workflow uses 'AWS_ROLE_ARN' secret for AWS credential configuration."
+    },
+    {
+      "type": "security",
+      "message": "The workflow uses 'ARGOCD_SERVER' and 'ARGOCD_AUTH_TOKEN' secrets for ArgoCD configuration."
+    },
+    {
+      "type": "security",
+      "message": "The workflow uses 'TF_DIR' environment variable that is not validated for security."
+    },
+    {
+      "type": "security",
+      "message": "The workflow uses multiple 'TF_VAR_*' environment variables that are set from user inputs without validation."
+    },
+    {
+      "type": "defect",
+      "message": "The 'approval' job references needs.validate.outputs.* but only declares 'needs: plan', so those values evaluate empty. The 'needs' list should include 'validate'."
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "path": "gitops/state-ui/argocd",
+  "file_count": 1,
+  "filetypes": ["yaml"],
+  "entrypoints": ["application.yaml"],
+  "notes": []
+}

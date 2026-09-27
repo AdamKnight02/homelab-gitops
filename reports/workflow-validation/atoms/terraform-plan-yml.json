@@ -1,0 +1,32 @@
+{
+  "workflow": ".github/workflows/terraform-plan.yml",
+  "triggers": [
+    "workflow_dispatch",
+    "workflow_call"
+  ],
+  "jobs": [
+    "plan",
+    "security-scan",
+    "checkov-scan",
+    "cost-estimate",
+    "plan-summary"
+  ],
+  "action_refs": [
+    "actions/checkout@v4",
+    "hashicorp/setup-terraform@v3",
+    "azure/login@v2",
+    "aws-actions/configure-aws-credentials@v4",
+    "aquasecurity/tfsec-action@v1.0.3",
+    "github/codeql-action/upload-sarif@v3",
+    "bridgecrewio/checkov-action@v12",
+    "infracost/actions/setup@v3",
+    "actions/upload-artifact@v4"
+  ],
+  "script_refs": [
+    {
+      "path": ".github/scripts/init-azure-backend.sh",
+      "exists": true
+    }
+  ],
+  "findings": []
+}

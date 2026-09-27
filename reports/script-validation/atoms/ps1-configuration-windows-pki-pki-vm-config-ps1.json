@@ -1,0 +1,12 @@
+{
+  "script": "configuration/windows/pki/pki-vm-config.ps1",
+  "balance_ok": true,
+  "issues": [],
+  "secret_patterns": [
+    "ca_common_name",
+    "db_connection_string",
+    "hsm_provider",
+    "hsm_endpoint"
+  ],
+  "purpose": "Configures a Windows Server as a PKI CA/OCSP/CRL server. This script is applied after the baseline configuration and requires parameters for customer ID, environment, and CA type."
+}

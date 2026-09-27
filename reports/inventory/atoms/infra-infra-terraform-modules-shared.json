@@ -1,0 +1,19 @@
+{
+  "path": "infra/terraform/modules/shared",
+  "file_count": 18,
+  "filetypes": [
+    ".tf"
+  ],
+  "entrypoints": [
+    "infra/terraform/modules/shared/contracts/main.tf",
+    "infra/terraform/modules/shared/naming/main.tf",
+    "infra/terraform/modules/shared/tagging/main.tf",
+    "infra/terraform/modules/shared/variables.tf",
+    "infra/terraform/modules/shared/versions.tf"
+  ],
+  "notes": [
+    "Directory exists at homelab-gitops/infra/terraform/modules/shared",
+    "Contains 18 Terraform files (.tf extension)",
+    "Entry points identified: main.tf files in contracts, naming, tagging modules and root module files"
+  ]
+}

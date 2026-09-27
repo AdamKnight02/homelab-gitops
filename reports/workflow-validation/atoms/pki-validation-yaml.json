@@ -1,0 +1,144 @@
+{
+  "workflow": ".github/workflows/pki-validation.yaml",
+  "triggers": [
+    {
+      "type": "push",
+      "branches": [
+        "main"
+      ],
+      "paths": [
+        "apps/pki/**",
+        "apps/openbao/**",
+        "apps/spire/**"
+      ]
+    },
+    {
+      "type": "pull_request",
+      "branches": [
+        "main"
+      ],
+      "paths": [
+        "apps/pki/**",
+        "apps/openbao/**",
+        "apps/spire/**"
+      ]
+    }
+  ],
+  "jobs": [
+    {
+      "name": "validate-manifests",
+      "runs_on": "ubuntu-latest",
+      "steps": [
+        {
+          "uses": "actions/checkout@v4"
+        },
+        {
+          "name": "Setup Kubectl",
+          "uses": "azure/setup-kubectl@v3",
+          "with": {
+            "version": "v1.28.0"
+          }
+        },
+        {
+          "name": "Validate Kubernetes manifests",
+          "run": "find apps/pki -name \"*.yaml\" -type f | while read file; do\n  echo \"Validating $file\"\n  kubectl apply --dry-run=client -f \"$file\" || exit 1\ndone"
+        },
+        {
+          "name": "Validate Kustomize builds",
+          "run": "cd apps/pki && kustomize build . > /dev/null || exit 1"
+        },
+        {
+          "name": "Check for secrets in manifests",
+          "run": "if grep -r \"password:\" apps/pki/ --include=\"*.yaml\" | grep -v \"password-change-me\"; then\n  echo \"ERROR: Hardcoded passwords found in manifests\"\n  exit 1\nfi\n\necho \"No hardcoded passwords found\""
+        }
+      ]
+    },
+    {
+      "name": "validate-policies",
+      "runs_on": "ubuntu-latest",
+      "steps": [
+        {
+          "uses": "actions/checkout@v4"
+        },
+        {
+          "name": "Validate policy syntax",
+          "run": "python3 -c \"\nimport yaml\nwith open('apps/pki/cert-worker/configmap-policy.yaml') as f:\n    config = yaml.safe_load(f)\n    policies = config['data']['policies.yaml']\n    policy_config = yaml.safe_load(policies)\n    print(f'Validated {len(policy_config[\"policies\"])} policies')\n\""
+        },
+        {
+          "name": "Validate PQC config",
+          "run": "python3 -c \"\nimport yaml\nwith open('apps/pki/cert-worker/configmap-pqc.yaml') as f:\n    config = yaml.safe_load(f)\n    pqc = yaml.safe_load(config['data']['pqc-policy.yaml'])\n    print(f'Validated PQC policy with {len(pqc[\"policy\"][\"algorithms\"])}} algorithm categories')\n\""
+        }
+      ]
+    },
+    {
+      "name": "validate-dockerfiles",
+      "runs_on": "ubuntu-latest",
+      "steps": [
+        {
+          "uses": "actions/checkout@v4"
+        },
+        {
+          "name": "Lint Dockerfiles",
+          "uses": "hadolint/hadolint-action@v3.1.0",
+          "with": {
+            "dockerfile": "apps/pki/cert-api/Dockerfile",
+            "ignore": "DL3008,DL3013"
+          }
+        },
+        {
+          "name": "Lint cert-worker Dockerfile",
+          "uses": "hadolint/hadolint-action@v3.1.0",
+          "with": {
+            "dockerfile": "apps/pki/cert-worker/Dockerfile",
+            "ignore": "DL3008,DL3013"
+          }
+        }
+      ]
+    },
+    {
+      "name": "validate-schema",
+      "runs_on": "ubuntu-latest",
+      "steps": [
+        {
+          "uses": "actions/checkout@v4"
+        },
+        {
+          "name": "Validate SQL schema",
+          "run": "# Check for basic SQL syntax\n\ngrep -E \"CREATE (TABLE|INDEX|VIEW)\" apps/pki/shared/schema.sql > /dev/null || {\n  echo \"ERROR: No CREATE statements found in schema\"\n  exit 1\n}\n\necho \"SQL schema validation passed\""
+        },
+        {
+          "name": "Validate Python syntax",
+          "run": "python3 -m py_compile apps/pki/cert-api/main.py\npython3 -m py_compile apps/pki/cert-worker/main.py\n\necho \"Python syntax validation passed\""
+        }
+      ]
+    }
+  ],
+  "action_refs": [
+    "actions/checkout@v4",
+    "azure/setup-kubectl@v3",
+    "hadolint/hadolint-action@v3.1.0"
+  ],
+  "script_refs": [
+    {
+      "path": "apps/pki/cert-worker/configmap-policy.yaml",
+      "exists": true
+    },
+    {
+      "path": "apps/pki/cert-worker/configmap-pqc.yaml",
+      "exists": true
+    },
+    {
+      "path": "apps/pki/shared/schema.sql",
+      "exists": true
+    },
+    {
+      "path": "apps/pki/cert-api/main.py",
+      "exists": true
+    },
+    {
+      "path": "apps/pki/cert-worker/main.py",
+      "exists": true
+    }
+  ],
+  "findings": []
+}

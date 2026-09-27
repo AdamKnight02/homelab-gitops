@@ -1,0 +1,27 @@
+{
+  "root": "/workspace/homelab-gitops",
+  "check": "infra/terraform/alibaba/.terraform.lock.hcl",
+  "status": "present",
+  "findings": [
+    {
+      "provider": "registry.terraform.io/aliyun/alicloud",
+      "version": "1.292.0",
+      "constraints": "~> 1.200"
+    },
+    {
+      "provider": "registry.terraform.io/hashicorp/local",
+      "version": "2.9.1",
+      "constraints": "~> 2.5"
+    },
+    {
+      "provider": "registry.terraform.io/hashicorp/random",
+      "version": "3.9.1",
+      "constraints": "~> 3.6"
+    },
+    {
+      "provider": "registry.terraform.io/hashicorp/tls",
+      "version": "4.4.1",
+      "constraints": "~> 4.0"
+    }
+  ]
+}

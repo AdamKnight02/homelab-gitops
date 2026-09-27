@@ -1,0 +1,16 @@
+{
+  "path": "gitops/monitoring/argocd/",
+  "file_count": 4,
+  "filetypes": [
+    ".yaml"
+  ],
+  "entrypoints": [
+    "gitops/monitoring/argocd/application-blackbox.yaml",
+    "gitops/monitoring/argocd/application-extras.yaml",
+    "gitops/monitoring/argocd/application.yaml",
+    "gitops/monitoring/argocd/applicationsets.yaml"
+  ],
+  "notes": [
+    "No kustomization.yaml, main.tf, or Chart.yaml found in the directory."
+  ]
+}

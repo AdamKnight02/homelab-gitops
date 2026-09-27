@@ -1,0 +1,1 @@
+{"root":"homelab-gitops/infra/terraform/azure","check":"backend.tf","status":"found","findings":[{"file":"homelab-gitops/infra/terraform/azure/backend.tf","type":"azurerm","key_fields":[],"commented_out":false}]}

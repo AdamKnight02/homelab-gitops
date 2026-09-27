@@ -71,7 +71,10 @@ on:
           - remove
 
 env:
-  TF_VERSION: '1.9.8'
+  AZURE_TFSTATE_RESOURCE_GROUP: ${{ vars.AZURE_TFSTATE_RESOURCE_GROUP }}
+  AZURE_TFSTATE_STORAGE_ACCOUNT: ${{ vars.AZURE_TFSTATE_STORAGE_ACCOUNT }}
+  AZURE_TFSTATE_CONTAINER: ${{ vars.AZURE_TFSTATE_CONTAINER }}
+  TF_VERSION: '1.10.5'
   TERRAFORM_WORKING_DIR: 'infra/terraform/azure'
   ADDON_NAMESPACE: 'pki'
   ARGOCD_NAMESPACE: 'argocd'
@@ -343,12 +346,7 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
         run: |
-          terraform init \
-            -backend-config="resource_group_name=pki-terraform-state" \
-            -backend-config="storage_account_name=pkterraformstate" \
-            -backend-config="container_name=tfstate" \
-            -backend-config="key=${{ needs.validate.outputs.state_key }}" \
-            -input=false
+          bash "$GITHUB_WORKSPACE/.github/scripts/init-azure-backend.sh" "${{ needs.validate.outputs.state_key }}"
 
       - name: Terraform Plan
         id: tfplan
@@ -506,12 +504,7 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
         run: |
-          terraform init \
-            -backend-config="resource_group_name=pki-terraform-state" \
-            -backend-config="storage_account_name=pkterraformstate" \
-            -backend-config="container_name=tfstate" \
-            -backend-config="key=${{ needs.validate.outputs.state_key }}" \
-            -input=false
+          bash "$GITHUB_WORKSPACE/.github/scripts/init-azure-backend.sh" "${{ needs.validate.outputs.state_key }}"
 
       - name: Terraform Apply
         working-directory: ${{ env.TERRAFORM_WORKING_DIR }}
@@ -780,12 +773,7 @@ jobs:
           # Setup Terraform for re-plan
           cd "${{ env.TERRAFORM_WORKING_DIR }}"
 
-          terraform init \
-            -backend-config="resource_group_name=pki-terraform-state" \
-            -backend-config="storage_account_name=pkterraformstate" \
-            -backend-config="container_name=tfstate" \
-            -backend-config="key=${{ needs.validate.outputs.state_key }}" \
-            -input=false > /dev/null 2>&1
+          bash "$GITHUB_WORKSPACE/.github/scripts/init-azure-backend.sh" "${{ needs.validate.outputs.state_key }}"
 
           # Re-run terraform plan to verify no changes
           terraform plan -detailed-exitcode \

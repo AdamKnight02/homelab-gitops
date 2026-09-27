@@ -1,0 +1,93 @@
+{
+  "workflow": ".github/workflows/destroy.yml",
+  "triggers": [
+    {
+      "type": "workflow_dispatch",
+      "inputs": {
+        "cloud_provider": {
+          "description": "Cloud provider",
+          "required": true,
+          "type": "choice",
+          "options": [
+            "azure",
+            "aws"
+          ]
+        },
+        "customer_name": {
+          "description": "Customer name (must match the workspace to destroy)",
+          "required": true,
+          "type": "string"
+        },
+        "environment": {
+          "description": "Environment to destroy",
+          "required": true,
+          "type": "choice",
+          "options": [
+            "dev",
+            "staging",
+            "production"
+          ]
+        },
+        "tfvars_file": {
+          "description": "Path to tfvars file (relative to provider dir)",
+          "required": false,
+          "type": "string",
+          "default": "terraform.tfvars"
+        },
+        "confirm_destroy": {
+          "description": "Type \"DESTROY\" to confirm teardown",
+          "required": true,
+          "type": "string"
+        }
+      }
+    }
+  ],
+  "jobs": [
+    "confirm",
+    "approval",
+    "pre-destroy",
+    "destroy",
+    "post-destroy-verify",
+    "cleanup",
+    "destroy-summary"
+  ],
+  "action_refs": [
+    "actions/checkout@v4",
+    "hashicorp/setup-terraform@v3",
+    "azure/login@v2",
+    "aws-actions/configure-aws-credentials@v4",
+    "actions/upload-artifact@v4"
+  ],
+  "script_refs": [
+    {
+      "path": ".github/scripts/init-azure-backend.sh",
+      "exists": false
+    }
+  ],
+  "findings": [
+    {
+      "type": "secret_usage",
+      "name": "AZURE_CLIENT_ID"
+    },
+    {
+      "type": "secret_usage",
+      "name": "AZURE_TENANT_ID"
+    },
+    {
+      "type": "secret_usage",
+      "name": "AZURE_SUBSCRIPTION_ID"
+    },
+    {
+      "type": "secret_usage",
+      "name": "AWS_ACCESS_KEY_ID"
+    },
+    {
+      "type": "secret_usage",
+      "name": "AWS_SECRET_ACCESS_KEY"
+    },
+    {
+      "type": "secret_usage",
+      "name": "AWS_DEFAULT_REGION"
+    }
+  ]
+}

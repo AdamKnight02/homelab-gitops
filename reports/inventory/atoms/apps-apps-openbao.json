@@ -1,0 +1,7 @@
+{
+  "path": "apps/openbao",
+  "file_count": 9,
+  "filetypes": [".yaml", ".hcl"],
+  "entrypoints": ["apps/openbao/application.yaml", "apps/openbao/kustomization.yaml"],
+  "notes": []
+}

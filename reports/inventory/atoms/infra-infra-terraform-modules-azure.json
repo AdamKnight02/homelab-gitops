@@ -1,0 +1,32 @@
+{
+  "path": "infra/terraform/modules/azure",
+  "file_count": 81,
+  "filetypes": [
+    "tf",
+    "tpl"
+  ],
+  "entrypoints": [
+    "infra/terraform/modules/azure/acme/main.tf",
+    "infra/terraform/modules/azure/automation/main.tf",
+    "infra/terraform/modules/azure/compute/main.tf",
+    "infra/terraform/modules/azure/database/main.tf",
+    "infra/terraform/modules/azure/gateway/main.tf",
+    "infra/terraform/modules/azure/identity/main.tf",
+    "infra/terraform/modules/azure/keyvault/main.tf",
+    "infra/terraform/modules/azure/kubernetes-bootstrap/main.tf",
+    "infra/terraform/modules/azure/load-balancer/main.tf",
+    "infra/terraform/modules/azure/monitoring-bootstrap/main.tf",
+    "infra/terraform/modules/azure/network/main.tf",
+    "infra/terraform/modules/azure/pki-vm/main.tf",
+    "infra/terraform/modules/azure/postgresql/main.tf",
+    "infra/terraform/modules/azure/resource-group/main.tf",
+    "infra/terraform/modules/azure/scep/main.tf",
+    "infra/terraform/modules/azure/secrets/main.tf",
+    "infra/terraform/modules/azure/security/main.tf",
+    "infra/terraform/modules/azure/storage/main.tf",
+    "infra/terraform/modules/azure/vm/main.tf"
+  ],
+  "notes": [
+    "Directory infra/terraform/modules/azure exists and contains 81 files."
+  ]
+}

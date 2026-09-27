@@ -1,0 +1,1 @@
+{"path":"gitops/state-api/overlays/","file_count":3,"filetypes":["yaml"],"entrypoints":["gitops/state-api/overlays/alibaba/kustomization.yaml","gitops/state-api/overlays/aws/kustomization.yaml","gitops/state-api/overlays/azure/kustomization.yaml"],"notes":[]}

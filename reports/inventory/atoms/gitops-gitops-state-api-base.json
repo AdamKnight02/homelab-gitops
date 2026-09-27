@@ -1,0 +1,9 @@
+{
+  "path": "gitops/state-api/base",
+  "file_count": 9,
+  "filetypes": [".yaml"],
+  "entrypoints": [
+    "gitops/state-api/base/kustomization.yaml"
+  ],
+  "notes": []
+}

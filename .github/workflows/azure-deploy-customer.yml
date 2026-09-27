@@ -86,7 +86,10 @@ on:
         default: deploy
 
 env:
-  TF_VERSION: '1.10.0'
+  AZURE_TFSTATE_RESOURCE_GROUP: ${{ vars.AZURE_TFSTATE_RESOURCE_GROUP }}
+  AZURE_TFSTATE_STORAGE_ACCOUNT: ${{ vars.AZURE_TFSTATE_STORAGE_ACCOUNT }}
+  AZURE_TFSTATE_CONTAINER: ${{ vars.AZURE_TFSTATE_CONTAINER }}
+  TF_VERSION: '1.10.5'
   TF_WORKING_DIR: 'infra/terraform/azure'
   EXPECTED_RESOURCES_ECONOMY: 10
   EXPECTED_RESOURCES_STANDARD: 48
@@ -268,8 +271,8 @@ jobs:
         run: |
           set -e
           cd ${{ env.TF_WORKING_DIR }}
-          echo "Using local state backend (remote state not yet configured)"
-          terraform init -input=false
+          echo "Initializing Azure backend for customer deployment"
+          bash "$GITHUB_WORKSPACE/.github/scripts/init-azure-backend.sh" "azure/${{ github.event.inputs.customer_id }}/${{ github.event.inputs.environment }}/terraform.tfstate"
 
       - name: Generate Terraform Variables
         run: |
@@ -439,7 +442,7 @@ jobs:
         run: |
           set -e
           cd ${{ env.TF_WORKING_DIR }}
-          terraform init -input=false
+          bash "$GITHUB_WORKSPACE/.github/scripts/init-azure-backend.sh" "azure/${{ github.event.inputs.customer_id }}/${{ github.event.inputs.environment }}/terraform.tfstate"
 
       - name: Download Plan Artifact
         uses: actions/download-artifact@v4

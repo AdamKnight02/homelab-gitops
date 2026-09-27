@@ -1,0 +1,41 @@
+{
+  "root": "infra/terraform/azure",
+  "check": "tfvars",
+  "status": "complete",
+  "findings": [
+    {
+      "type": "defined-but-unused",
+      "variables": [
+        "azure_vm_os",
+        "azure_admin_username",
+        "azure_ssh_public_key",
+        "azure_vnet_name",
+        "azure_subnet_name",
+        "azure_nsg_name",
+        "azure_accelerated_networking",
+        "owner",
+        "managed_by",
+        "ephemeral",
+        "cost_center",
+        "allow_ssh_cidr",
+        "argocd_version",
+        "git_repo_url",
+        "git_target_revision",
+        "alert_email",
+        "k3s_token",
+        "enable_azure_csi",
+        "enable_azure_ccm"
+      ]
+    },
+    {
+      "type": "used-but-undefined",
+      "variables": [
+        "vm_size",
+        "vm_admin_username",
+        "ssh_public_key",
+        "vnet_cidr",
+        "os_disk_size"
+      ]
+    }
+  ]
+}

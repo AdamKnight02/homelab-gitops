@@ -1,0 +1,10 @@
+{
+  "path": "apps/rabbitmq",
+  "file_count": 6,
+  "filetypes": [".yaml"],
+  "entrypoints": [
+    "apps/rabbitmq/application.yaml",
+    "apps/rabbitmq/kustomization.yaml"
+  ],
+  "notes": ["Corrected file count from 5 to 6 based on actual directory listing; all 6 YAML files are present: application.yaml, kustomization.yaml, namespace.yaml, secret.yaml, service.yaml, statefulset.yaml"]
+}

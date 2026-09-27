@@ -1,0 +1,7 @@
+{
+  "path": "apps/base",
+  "file_count": 1,
+  "filetypes": [".yaml"],
+  "entrypoints": ["apps/base/kustomization.yaml"],
+  "notes": ["Directory apps/base is not empty; it contains kustomization.yaml."]
+}

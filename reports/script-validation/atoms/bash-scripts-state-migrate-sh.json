@@ -1,0 +1,1 @@
+{"script":"./homelab-gitops/scripts/state-migrate.sh","bash_n_exit":0,"errors":[],"purpose":"Migrates Terraform state from local backend to Azure remote backend with comprehensive safety checks, backup, and validation."}

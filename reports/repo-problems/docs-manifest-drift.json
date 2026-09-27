@@ -1,0 +1,101 @@
+{
+ "check": "docs-manifest-drift",
+ "findings": [
+  {
+   "severity": "WARN",
+   "doc": "docs/architecture/integration-review.md",
+   "reference": "infra/terraform/modules/alibaba/*",
+   "problem": "documented path does not exist"
+  },
+  {
+   "severity": "WARN",
+   "doc": "docs/architecture/integration-review.md",
+   "reference": "scripts/validate-state-identity.sh",
+   "problem": "documented path does not exist"
+  },
+  {
+   "severity": "WARN",
+   "doc": "docs/architecture/integration-review.md",
+   "reference": "gitops/external-ca-gateway/base/networkpolicy.yaml",
+   "problem": "documented path does not exist"
+  },
+  {
+   "severity": "WARN",
+   "doc": "docs/architecture/integration-review.md",
+   "reference": "infra/terraform/aws/tier-config/tier-config.tf",
+   "problem": "documented path does not exist"
+  },
+  {
+   "severity": "WARN",
+   "doc": "docs/architecture/integration-review.md",
+   "reference": "infra/terraform/modules/aws/*",
+   "problem": "documented path does not exist"
+  },
+  {
+   "severity": "WARN",
+   "doc": "docs/architecture/state-safety.md",
+   "reference": "customers/{customer}/{environment}/{provider}/{component}/terraform.tfstate",
+   "problem": "documented path does not exist"
+  },
+  {
+   "severity": "WARN",
+   "doc": "docs/cloud/crash-course.md",
+   "reference": "infra/terraform/azure/providers.tf",
+   "problem": "documented path does not exist"
+  },
+  {
+   "severity": "WARN",
+   "doc": "docs/monitoring/alerts.md",
+   "reference": "gitops/monitoring/customers/<id>",
+   "problem": "documented path does not exist"
+  },
+  {
+   "severity": "WARN",
+   "doc": "docs/monitoring/prometheus.md",
+   "reference": "customers/_template/customer-overlay.yaml",
+   "problem": "documented path does not exist"
+  },
+  {
+   "severity": "WARN",
+   "doc": "docs/operations/customer-deployment.md",
+   "reference": "customers/definitions",
+   "problem": "documented path does not exist"
+  },
+  {
+   "severity": "WARN",
+   "doc": "docs/security/security-review.md",
+   "reference": "infra/terraform/*/main.tf",
+   "problem": "documented path does not exist"
+  },
+  {
+   "severity": "WARN",
+   "doc": "docs/security/security-review.md",
+   "reference": "docs/cloud/manifests/base/networkpolicy-*.yaml",
+   "problem": "documented path does not exist"
+  },
+  {
+   "severity": "WARN",
+   "doc": "docs/security/security-review.md",
+   "reference": "infra/terraform/*",
+   "problem": "documented path does not exist"
+  },
+  {
+   "severity": "WARN",
+   "doc": "docs/security/security-review.md",
+   "reference": "infra/terraform/modules/*/security",
+   "problem": "documented path does not exist"
+  },
+  {
+   "severity": "WARN",
+   "doc": "docs/testing/smoke-tests.md",
+   "reference": "tests/reports/<timestamp>/test-report.json",
+   "problem": "documented path does not exist"
+  },
+  {
+   "severity": "WARN",
+   "doc": "docs/testing/smoke-tests.md",
+   "reference": "tests/reports/<timestamp>/test-report.txt",
+   "problem": "documented path does not exist"
+  }
+ ]
+}

@@ -1,0 +1,1 @@
+{"root":"homelab-gitops/infra/terraform/bootstrap/state","check":"terraform fmt -check -recursive","status":0,"findings":[]}

@@ -1,0 +1,65 @@
+{
+  "workflow": ".github/workflows/deploy-aws-lab.yml",
+  "triggers": [
+    "workflow_dispatch"
+  ],
+  "jobs": [
+    {
+      "name": "terraform",
+      "runs_on": "ubuntu-latest",
+      "permissions": {
+        "contents": "read",
+        "id-token": "write"
+      },
+      "defaults": {
+        "run": {
+          "working-directory": "infra/terraform/aws"
+        }
+      },
+      "steps": [
+        {
+          "name": "Checkout repository",
+          "uses": "actions/checkout@v4"
+        },
+        {
+          "name": "Configure AWS credentials",
+          "uses": "aws-actions/configure-aws-credentials@v4",
+          "with": {
+            "role-to-assume": "${{ vars.AWS_ROLE_ARN }}",
+            "aws-region": "${{ inputs.aws_region }}"
+          }
+        },
+        {
+          "name": "Setup Terraform",
+          "uses": "hashicorp/setup-terraform@v3",
+          "with": {
+            "terraform_version": "1.10.5"
+          }
+        },
+        {
+          "name": "Terraform Init",
+          "run": "terraform init"
+        },
+        {
+          "name": "Terraform Validate",
+          "run": "terraform validate"
+        },
+        {
+          "name": "Terraform Plan",
+          "run": "terraform plan \\\n  -var=\"environment=${{ inputs.environment }}\" \\\n  -var=\"instance_type=${{ inputs.instance_type }}\" \\\n  -var=\"root_volume_size=${{ inputs.root_volume_size }}\" \\\n  -var=\"aws_region=${{ inputs.aws_region }}\" \\\n  -var=\"key_name=homelab-access\""
+        },
+        {
+          "name": "Terraform Apply",
+          "run": "terraform apply -auto-approve \\\n  -var=\"environment=${{ inputs.environment }}\" \\\n  -var=\"instance_type=${{ inputs.instance_type }}\" \\\n  -var=\"root_volume_size=${{ inputs.root_volume_size }}\" \\\n  -var=\"aws_region=${{ inputs.aws_region }}\" \\\n  -var=\"key_name=homelab-access\""
+        }
+      ]
+    }
+  ],
+  "action_refs": [
+    "actions/checkout@v4",
+    "aws-actions/configure-aws-credentials@v4",
+    "hashicorp/setup-terraform@v3"
+  ],
+  "script_refs": [],
+  "findings": []
+}

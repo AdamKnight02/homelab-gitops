@@ -1,0 +1,23 @@
+{
+  "path": "infra/terraform/modules/alibaba",
+  "file_count": 55,
+  "filetypes": [
+    "tf",
+    "tpl",
+    "hcl"
+  ],
+  "entrypoints": [
+    "infra/terraform/modules/alibaba/compute/main.tf",
+    "infra/terraform/modules/alibaba/database/main.tf",
+    "infra/terraform/modules/alibaba/identity/main.tf",
+    "infra/terraform/modules/alibaba/kubernetes-bootstrap/main.tf",
+    "infra/terraform/modules/alibaba/load-balancer/main.tf",
+    "infra/terraform/modules/alibaba/monitoring-bootstrap/main.tf",
+    "infra/terraform/modules/alibaba/network/main.tf",
+    "infra/terraform/modules/alibaba/secrets/main.tf",
+    "infra/terraform/modules/alibaba/security/main.tf",
+    "infra/terraform/modules/alibaba/storage/main.tf",
+    "infra/terraform/modules/alibaba/tier-config/main.tf"
+  ],
+  "notes": []
+}

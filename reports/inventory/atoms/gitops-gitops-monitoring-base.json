@@ -1,0 +1,16 @@
+{
+  "path": "gitops/monitoring/base",
+  "file_count": 35,
+  "filetypes": ["yaml", "json", "py"],
+  "entrypoints": [
+    "gitops/monitoring/base/alert-rules/kustomization.yaml",
+    "gitops/monitoring/base/prometheus-stack/kustomization.yaml",
+    "gitops/monitoring/base/servicemonitors/kustomization.yaml",
+    "gitops/monitoring/base/grafana-dashboards/kustomization.yaml"
+  ],
+  "notes": [
+    "Directory contains alerting, exporter, dashboard, and service monitor configurations for PKI platform monitoring.",
+    "Entry points include kustomization files for various components.",
+    "File extensions include yaml, json, and py (Python scripts)."
+  ]
+}

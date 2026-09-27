@@ -1,0 +1,60 @@
+{
+ "check": "dup-monitoring",
+ "findings": [
+  {
+   "severity": "INFO",
+   "locations": {
+    ".clawhub": [
+     ".clawhub/lock.json"
+    ],
+    ".github": [
+     ".github/workflows/azure-deploy-customer.yml"
+    ],
+    "apps": [
+     "apps/cert-manager/values.yaml",
+     "apps/pki/kustomization.yaml",
+     "apps/pki/prometheusrules-pki.yaml",
+     "apps/pki/cert-worker/configmap-renewal.yaml"
+    ],
+    "customers": [
+     "customers/examples/acme-dev.yaml",
+     "customers/examples/contoso-prod.yaml",
+     "customers/schema/customer-v1.yaml"
+    ],
+    "gitops": [
+     "gitops/projects/platform-system.yaml",
+     "gitops/state-api/base/deployment.yaml",
+     "gitops/state-api/base/networkpolicy.yaml",
+     "gitops/state-api/base/servicemonitor.yaml",
+     "gitops/monitoring/argocd/application-blackbox.yaml",
+     "gitops/monitoring/argocd/application.yaml"
+    ],
+    "infra": [
+     "infra/terraform/alibaba/main.tf",
+     "infra/terraform/modules/shared/variables.tf",
+     "infra/terraform/modules/alibaba/monitoring-bootstrap/main.tf",
+     "infra/terraform/modules/alibaba/monitoring-bootstrap/outputs.tf",
+     "infra/terraform/modules/alibaba/monitoring-bootstrap/variables.tf"
+    ],
+    "pipelines": [
+     "pipelines/azure/deploy-customer.yml"
+    ],
+    "reports": [
+     "reports/inventory/atoms/gitops-gitops-monitoring-base.json"
+    ],
+    "skills": [
+     "skills/grafana-monitoring/_meta.json",
+     "skills/prometheus/_meta.json",
+     "skills/prometheus/package.json",
+     "skills/prometheus/.clawhub/origin.json",
+     "skills/kubernetes-devops/assets/configmap-template.yaml",
+     "skills/kubernetes-devops/assets/cronjob-template.yaml"
+    ],
+    "tests": [
+     "tests/config/test-config.yaml"
+    ]
+   },
+   "problem": "monitoring stack referenced under 10 top-level trees"
+  }
+ ]
+}

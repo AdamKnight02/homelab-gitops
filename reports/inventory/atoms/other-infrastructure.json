@@ -1,0 +1,7 @@
+{
+  "path": "homelab-gitops/infrastructure",
+  "file_count": 9,
+  "filetypes": [".service", ".sh", ".yaml"],
+  "entrypoints": ["homelab-gitops/infrastructure/k3s-pod-watcher/kustomization.yaml", "homelab-gitops/infrastructure/registry/application.yaml", "homelab-gitops/infrastructure/registry/kustomization.yaml"],
+  "notes": []
+}

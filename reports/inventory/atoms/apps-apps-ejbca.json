@@ -1,0 +1,11 @@
+{
+  "path": "apps/ejbca",
+  "file_count": 2,
+  "filetypes": [
+    ".yaml"
+  ],
+  "entrypoints": [
+    "apps/ejbca/application.yaml"
+  ],
+  "notes": []
+}

@@ -1,0 +1,44 @@
+{
+  "workflow": ".github/workflows/aws-deploy-addon.yml",
+  "triggers": [
+    "workflow_dispatch"
+  ],
+  "jobs": [
+    "validate",
+    "plan",
+    "approval",
+    "deploy-addon",
+    "smoke-tests",
+    "report"
+  ],
+  "action_refs": [
+    "actions/checkout@v4",
+    "aws-actions/configure-aws-credentials@v4",
+    "hashicorp/setup-terraform@v3",
+    "actions/upload-artifact@v4"
+  ],
+  "script_refs": [
+    {
+      "path": "infra/terraform/aws/.terraform",
+      "exists": false
+    }
+  ],
+  "findings": [
+    {
+      "type": "security",
+      "message": "Workflow uses AWS credentials with role assumption. Ensure that AWS_DEPLOY_ROLE_ARN is properly restricted with least privilege IAM policies."
+    },
+    {
+      "type": "security",
+      "message": "Job 'plan' uses 'TF_STATE_KEY' with customer ID and environment in the state key. Ensure proper encryption and access control for Terraform state files."
+    },
+    {
+      "type": "security",
+      "message": "Job 'deploy-addon' uses 'terraform apply' with '-auto-approve'. Ensure this is intentional and safe for production environments."
+    },
+    {
+      "type": "security",
+      "message": "Job 'report' generates a report with sensitive information such as customer ID, environment, and addon type. Ensure this report is not exposed to unauthorized users."
+    }
+  ]
+}

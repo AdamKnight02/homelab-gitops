@@ -1,0 +1,34 @@
+{
+  "root": "infra/terraform/aws",
+  "check": "tfvars",
+  "status": "complete",
+  "findings": [
+    {
+      "type": "defined-but-unused",
+      "names": [
+        "aws_admin_username",
+        "aws_ami_name_filter",
+        "aws_ami_owner",
+        "aws_availability_zone",
+        "aws_enable_monitoring",
+        "aws_iam_role_name",
+        "aws_ssh_public_key",
+        "cost_center",
+        "ephemeral",
+        "managed_by",
+        "network_cidr",
+        "owner"
+      ]
+    },
+    {
+      "type": "used-but-undefined",
+      "names": [
+        "allowed_ssh_cidr",
+        "instance_type",
+        "root_volume_size",
+        "trust_domain",
+        "vpc_cidr"
+      ]
+    }
+  ]
+}

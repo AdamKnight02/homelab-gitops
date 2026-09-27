@@ -1,0 +1,1 @@
+{"path":"docs/testing/","file_count":2,"filetypes":[".md"],"entrypoints":[],"notes":["contains lifecycle-tests.md and provider-test-matrix.md; no kustomization.yaml/application.yaml/main.tf/Chart.yaml entrypoints present"]}

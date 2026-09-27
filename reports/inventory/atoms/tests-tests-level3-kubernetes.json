@@ -1,0 +1,7 @@
+{
+  "path": "tests/level3-kubernetes",
+  "file_count": 2,
+  "filetypes": [".py"],
+  "entrypoints": ["tests/level3-kubernetes/test_kubernetes.py"],
+  "notes": []
+}

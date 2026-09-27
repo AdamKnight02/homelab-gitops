@@ -1,0 +1,1 @@
+{"path":"tests/level6-idempotency/","file_count":2,"filetypes":[".py"],"entrypoints":[],"notes":["Contains __init__.py and test_idempotency.py only","No kustomization.yaml, application.yaml, main.tf, Chart.yaml, or similar entrypoint files present; test_idempotency.py is the runnable test module (has __main__ block)"]}

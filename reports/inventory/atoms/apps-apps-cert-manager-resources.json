@@ -1,0 +1,11 @@
+{
+  "path": "apps/cert-manager/resources",
+  "file_count": 2,
+  "filetypes": [
+    ".yaml"
+  ],
+  "entrypoints": [],
+  "notes": [
+    "Directory apps/cert-manager/resources exists."
+  ]
+}

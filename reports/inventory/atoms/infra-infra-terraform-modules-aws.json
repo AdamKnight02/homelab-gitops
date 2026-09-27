@@ -1,0 +1,12 @@
+{
+  "path": "infra/terraform/modules/aws",
+  "file_count": 14,
+  "filetypes": [
+    "tf"
+  ],
+  "entrypoints": [
+    "infra/terraform/modules/aws/network.tf",
+    "infra/terraform/modules/aws/tier-config.tf"
+  ],
+  "notes": []
+}

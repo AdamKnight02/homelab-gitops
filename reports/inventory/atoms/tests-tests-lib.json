@@ -1,0 +1,7 @@
+{
+  "path": "tests/lib",
+  "file_count": 2,
+  "filetypes": [".py"],
+  "entrypoints": [],
+  "notes": ["no entrypoint files present"]
+}

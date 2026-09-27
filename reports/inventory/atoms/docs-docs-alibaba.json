@@ -1,0 +1,10 @@
+{
+  "path": "docs/alibaba",
+  "file_count": 3,
+  "filetypes": ["md"],
+  "entrypoints": [],
+  "notes": [
+    "Directory contains documentation files for Alibaba Cloud infrastructure",
+    "Includes architecture overview, deployment guide, and tier definitions"
+  ]
+}

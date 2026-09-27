@@ -1,0 +1,1 @@
+{"path":"infra/terraform/bootstrap/state","file_count":5,"filetypes":["md","tf"],"entrypoints":["main.tf","outputs.tf","variables.tf"],"notes":[]}

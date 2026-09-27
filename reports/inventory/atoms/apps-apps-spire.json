@@ -1,0 +1,12 @@
+{
+  "path": "apps/spire",
+  "file_count": 15,
+  "filetypes": [
+    "yaml"
+  ],
+  "entrypoints": [
+    "apps/spire/application.yaml",
+    "apps/spire/kustomization.yaml"
+  ],
+  "notes": []
+}

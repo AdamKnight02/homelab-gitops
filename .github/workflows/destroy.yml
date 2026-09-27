@@ -33,7 +33,7 @@ on:
         type: string
 
 env:
-  TF_VERSION: '1.9.8'
+  TF_VERSION: '1.10.5'
 
 permissions:
   id-token: write
@@ -129,7 +129,18 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
 
+      - name: Initialize Azure Backend
+        if: inputs.cloud_provider == 'azure'
+        working-directory: ${{ env.TF_DIR }}
+        env:
+          AZURE_TFSTATE_RESOURCE_GROUP: ${{ vars.AZURE_TFSTATE_RESOURCE_GROUP }}
+          AZURE_TFSTATE_STORAGE_ACCOUNT: ${{ vars.AZURE_TFSTATE_STORAGE_ACCOUNT }}
+          AZURE_TFSTATE_CONTAINER: ${{ vars.AZURE_TFSTATE_CONTAINER }}
+        run: |
+          bash "$GITHUB_WORKSPACE/.github/scripts/init-azure-backend.sh" "azure.terraform.tfstate"
+
       - name: Terraform Init
+        if: inputs.cloud_provider == 'aws'
         working-directory: ${{ env.TF_DIR }}
         run: terraform init -input=false
 
@@ -320,7 +331,18 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
 
+      - name: Initialize Azure Backend
+        if: inputs.cloud_provider == 'azure'
+        working-directory: ${{ env.TF_DIR }}
+        env:
+          AZURE_TFSTATE_RESOURCE_GROUP: ${{ vars.AZURE_TFSTATE_RESOURCE_GROUP }}
+          AZURE_TFSTATE_STORAGE_ACCOUNT: ${{ vars.AZURE_TFSTATE_STORAGE_ACCOUNT }}
+          AZURE_TFSTATE_CONTAINER: ${{ vars.AZURE_TFSTATE_CONTAINER }}
+        run: |
+          bash "$GITHUB_WORKSPACE/.github/scripts/init-azure-backend.sh" "azure.terraform.tfstate"
+
       - name: Terraform Init
+        if: inputs.cloud_provider == 'aws'
         working-directory: ${{ env.TF_DIR }}
         run: terraform init -input=false
 
@@ -422,7 +444,18 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
 
+      - name: Initialize Azure Backend
+        if: inputs.cloud_provider == 'azure'
+        working-directory: ${{ env.TF_DIR }}
+        env:
+          AZURE_TFSTATE_RESOURCE_GROUP: ${{ vars.AZURE_TFSTATE_RESOURCE_GROUP }}
+          AZURE_TFSTATE_STORAGE_ACCOUNT: ${{ vars.AZURE_TFSTATE_STORAGE_ACCOUNT }}
+          AZURE_TFSTATE_CONTAINER: ${{ vars.AZURE_TFSTATE_CONTAINER }}
+        run: |
+          bash "$GITHUB_WORKSPACE/.github/scripts/init-azure-backend.sh" "azure.terraform.tfstate"
+
       - name: Terraform Init
+        if: inputs.cloud_provider == 'aws'
         working-directory: ${{ env.TF_DIR }}
         run: terraform init -input=false
 
@@ -547,7 +580,18 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
 
+      - name: Initialize Azure Backend
+        if: inputs.cloud_provider == 'azure'
+        working-directory: ${{ env.TF_DIR }}
+        env:
+          AZURE_TFSTATE_RESOURCE_GROUP: ${{ vars.AZURE_TFSTATE_RESOURCE_GROUP }}
+          AZURE_TFSTATE_STORAGE_ACCOUNT: ${{ vars.AZURE_TFSTATE_STORAGE_ACCOUNT }}
+          AZURE_TFSTATE_CONTAINER: ${{ vars.AZURE_TFSTATE_CONTAINER }}
+        run: |
+          bash "$GITHUB_WORKSPACE/.github/scripts/init-azure-backend.sh" "azure.terraform.tfstate"
+
       - name: Terraform Init
+        if: inputs.cloud_provider == 'aws'
         working-directory: ${{ env.TF_DIR }}
         run: terraform init -input=false
 

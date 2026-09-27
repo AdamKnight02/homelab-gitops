@@ -1,0 +1,1 @@
+{"script":"scripts/state-validate.sh","bash_n_exit":0,"errors":[],"purpose":"Terraform State Validation Script that validates provider/customer/environment/component identity, state integrity, and safety rules before any plan/apply/destroy operation."}

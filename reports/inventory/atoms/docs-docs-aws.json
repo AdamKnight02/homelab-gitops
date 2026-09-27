@@ -1,0 +1,11 @@
+{
+  "path": "docs/aws",
+  "file_count": 3,
+  "filetypes": [
+    "md"
+  ],
+  "entrypoints": [],
+  "notes": [
+    "3 markdown docs; no IaC entrypoint files"
+  ]
+}

@@ -1,0 +1,112 @@
+{
+ "check": "dup-terraform-modules",
+ "findings": [
+  {
+   "severity": "WARN",
+   "module": "compute",
+   "definitions": [
+    "infra/terraform/alibaba/main.tf",
+    "infra/terraform/aws/main.tf",
+    "infra/terraform/azure/main.tf"
+   ],
+   "problem": "module \"compute\" defined in 3 files"
+  },
+  {
+   "severity": "WARN",
+   "module": "database",
+   "definitions": [
+    "infra/terraform/alibaba/main.tf",
+    "infra/terraform/aws/main.tf",
+    "infra/terraform/azure/main.tf"
+   ],
+   "problem": "module \"database\" defined in 3 files"
+  },
+  {
+   "severity": "WARN",
+   "module": "identity",
+   "definitions": [
+    "infra/terraform/alibaba/main.tf",
+    "infra/terraform/aws/main.tf",
+    "infra/terraform/azure/main.tf"
+   ],
+   "problem": "module \"identity\" defined in 3 files"
+  },
+  {
+   "severity": "WARN",
+   "module": "kubernetes_bootstrap",
+   "definitions": [
+    "infra/terraform/alibaba/main.tf",
+    "infra/terraform/aws/main.tf",
+    "infra/terraform/azure/main.tf"
+   ],
+   "problem": "module \"kubernetes_bootstrap\" defined in 3 files"
+  },
+  {
+   "severity": "WARN",
+   "module": "load_balancer",
+   "definitions": [
+    "infra/terraform/alibaba/main.tf",
+    "infra/terraform/aws/main.tf",
+    "infra/terraform/azure/main.tf"
+   ],
+   "problem": "module \"load_balancer\" defined in 3 files"
+  },
+  {
+   "severity": "WARN",
+   "module": "monitoring",
+   "definitions": [
+    "infra/terraform/alibaba/main.tf",
+    "infra/terraform/azure/main.tf"
+   ],
+   "problem": "module \"monitoring\" defined in 2 files"
+  },
+  {
+   "severity": "WARN",
+   "module": "network",
+   "definitions": [
+    "infra/terraform/alibaba/main.tf",
+    "infra/terraform/aws/main.tf"
+   ],
+   "problem": "module \"network\" defined in 2 files"
+  },
+  {
+   "severity": "WARN",
+   "module": "secrets",
+   "definitions": [
+    "infra/terraform/alibaba/main.tf",
+    "infra/terraform/aws/main.tf",
+    "infra/terraform/azure/main.tf"
+   ],
+   "problem": "module \"secrets\" defined in 3 files"
+  },
+  {
+   "severity": "WARN",
+   "module": "security",
+   "definitions": [
+    "infra/terraform/alibaba/main.tf",
+    "infra/terraform/aws/main.tf"
+   ],
+   "problem": "module \"security\" defined in 2 files"
+  },
+  {
+   "severity": "WARN",
+   "module": "storage",
+   "definitions": [
+    "infra/terraform/alibaba/main.tf",
+    "infra/terraform/aws/main.tf",
+    "infra/terraform/azure/main.tf"
+   ],
+   "problem": "module \"storage\" defined in 3 files"
+  },
+  {
+   "severity": "WARN",
+   "module": "tier_config",
+   "definitions": [
+    "infra/terraform/alibaba/main.tf",
+    "infra/terraform/aws/main.tf",
+    "infra/terraform/azure/locals.tf"
+   ],
+   "problem": "module \"tier_config\" defined in 3 files"
+  }
+ ]
+}

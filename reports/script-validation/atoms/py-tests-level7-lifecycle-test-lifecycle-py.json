@@ -1,0 +1,1 @@
+{"script":"tests/level7-lifecycle/test_lifecycle.py","compile_exit":0,"errors":[],"purpose":"Level 7 lifecycle tests (needs cloud credentials and an ephemeral env)"}

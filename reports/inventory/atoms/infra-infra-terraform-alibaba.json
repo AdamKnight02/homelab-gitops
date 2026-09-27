@@ -1,0 +1,19 @@
+{
+  "path": "infra/terraform/alibaba/",
+  "file_count": 9,
+  "filetypes": [".tf", ".md", ".hcl", ".tpl", ".example"],
+  "entrypoints": [
+    "infra/terraform/alibaba/main.tf",
+    "infra/terraform/alibaba/variables.tf",
+    "infra/terraform/alibaba/locals.tf",
+    "infra/terraform/alibaba/outputs.tf",
+    "infra/terraform/alibaba/versions.tf"
+  ],
+  "notes": [
+    "Directory path is relative to workspace root.",
+    "Entry points include main.tf, variables.tf, locals.tf, outputs.tf, and versions.tf.",
+    "Template file cloud-init.yaml.tpl is present but not considered an entry point.",
+    "The .terraform.lock.hcl file is a generated file and not counted as a source file.",
+    "The terraform.tfvars.example is an example file, not an entrypoint."
+  ]
+}

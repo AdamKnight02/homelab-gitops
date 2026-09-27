@@ -1,0 +1,37 @@
+{
+  "subsystems": [
+    {
+      "name": "apps",
+      "total_files": 102
+    },
+    {
+      "name": "gitops",
+      "total_files": 95
+    },
+    {
+      "name": "infra",
+      "total_files": 198
+    },
+    {
+      "name": "config",
+      "total_files": 5
+    },
+    {
+      "name": "scripts",
+      "total_files": 2
+    },
+    {
+      "name": "docs",
+      "total_files": 72
+    },
+    {
+      "name": "tests",
+      "total_files": 23
+    },
+    {
+      "name": "other",
+      "total_files": 38
+    }
+  ],
+  "grand_total_files": 535
+}

@@ -1,0 +1,13 @@
+{
+  "path": "infra/terraform/azure",
+  "file_count": 2,
+  "filetypes": [
+    ".md",
+    ".hcl"
+  ],
+  "entrypoints": [],
+  "notes": [
+    "Directory infra/terraform/azure exists with .terraform.lock.hcl and README.md files",
+    "No main.tf or other entrypoint files found in the directory"
+  ]
+}

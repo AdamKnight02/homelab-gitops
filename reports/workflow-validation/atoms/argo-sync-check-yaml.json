@@ -1,0 +1,27 @@
+{
+  "workflow": ".github/workflows/argo-sync-check.yaml",
+  "triggers": [
+    "schedule: 0 */6 * * *",
+    "workflow_dispatch"
+  ],
+  "jobs": [
+    {
+      "name": "check-sync",
+      "runs-on": "ubuntu-latest",
+      "steps": [
+        {
+          "name": "Check Argo CD Application Status",
+          "run": "echo \"Checking Argo CD application sync status...\"\necho \"Expected applications:\"\necho \"  - pki (should be Synced and Healthy)\"\necho \"  - openbao (should be Synced and Healthy)\"\necho \"  - spire (should be Synced and Healthy)\"\necho \"  - cert-manager (should be Synced and Healthy)\"\necho \"\"\necho \"Note: In production, this would query the Argo CD API\"\necho \"and alert if any application is OutOfSync or Degraded\""
+        }
+      ]
+    }
+  ],
+  "action_refs": [],
+  "script_refs": [],
+  "findings": [
+    {
+      "type": "schema",
+      "message": "The workflow file is valid YAML but contains a step with a 'run' command that only prints expected checks instead of actually performing them. This appears to be a placeholder or documentation step."
+    }
+  ]
+}

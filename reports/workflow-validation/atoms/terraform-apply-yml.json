@@ -1,0 +1,34 @@
+{
+  "workflow": ".github/workflows/terraform-apply.yml",
+  "triggers": [
+    "workflow_dispatch",
+    "workflow_call"
+  ],
+  "jobs": [
+    "approval-gate",
+    "apply",
+    "verify"
+  ],
+  "action_refs": [
+    "actions/checkout@v4",
+    "hashicorp/setup-terraform@v3",
+    "azure/login@v2",
+    "aws-actions/configure-aws-credentials@v4",
+    "actions/upload-artifact@v4",
+    "actions/download-artifact@v4"
+  ],
+  "script_refs": [
+    {
+      "path": ".github/scripts/init-azure-backend.sh",
+      "exists": false
+    }
+  ],
+  "findings": [
+    "The script '.github/scripts/init-azure-backend.sh' referenced in the 'Initialize Azure Backend' step does not exist on disk.",
+    "The workflow uses a 'workflow_call' trigger, which means it can be called by other workflows, but it's not explicitly defined in the repository's workflows directory.",
+    "The workflow uses environment variables that are set from secrets (e.g., ARM_CLIENT_ID, ARM_TENANT_ID, etc.) but no validation is performed to ensure these secrets are properly configured.",
+    "The 'verify' job has a placeholder for 'Infrastructure Health Check' that needs to be implemented with actual checks.",
+    "The 'apply' job uses 'terraform apply' with '-auto-approve', which can be dangerous if not properly controlled.",
+    "The 'apply' job uses 'terraform output -json' and then processes the output with Python, which could be a security risk if the output is not properly sanitized."
+  ]
+}

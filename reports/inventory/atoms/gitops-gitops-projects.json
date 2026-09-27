@@ -1,0 +1,1 @@
+{"path":"gitops/projects/","file_count":2,"filetypes":[".yaml"],"entrypoints":[],"notes":["2 files: customer-template.yaml, pki-infrastructure.yaml; no kustomization.yaml/application.yaml/main.tf/Chart.yaml present; both are ArgoCD AppProject manifests"]}

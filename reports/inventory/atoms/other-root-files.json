@@ -1,0 +1,25 @@
+{
+  "path": "/home/frostnode/.openclaw/workspaces/qwen-worker/homelab-gitops",
+  "file_count": 17,
+  "filetypes": ["md", "py", "json", "txt", "no_extension"],
+  "entrypoints": ["README.md", "AGENTS.md"],
+  "notes": [
+    "AGENTS.md",
+    "convert_to_pdf.py",
+    ".gitignore",
+    "HEARTBEAT.md",
+    "IDENTITY.md",
+    "INVENTORY-REPORT.md",
+    "openclaw-workspace-state.json",
+    "PHASE5-6-SUMMARY.md",
+    "PHASES-8-24-EXECUTION-REPORT.md",
+    "PKI-HOMELAB-MASTER-GUIDE.md",
+    "prometheus.json",
+    "README.md",
+    "SESSION-STATE.md",
+    "SOUL.md",
+    "test-flush-status.txt",
+    "TOOLS.md",
+    "USER.md"
+  ]
+}

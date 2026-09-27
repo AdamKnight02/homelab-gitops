@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ca-service
+  namespace: pki
+spec:
+  template:
+    spec:
+      containers:
+      - name: service
+        image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/ca-service:latest

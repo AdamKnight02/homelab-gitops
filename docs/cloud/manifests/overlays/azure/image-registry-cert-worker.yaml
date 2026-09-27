@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cert-worker
+  namespace: pki
+spec:
+  template:
+    spec:
+      containers:
+      - name: worker
+        image: pkiazurecr.azurecr.io/cert-worker:latest

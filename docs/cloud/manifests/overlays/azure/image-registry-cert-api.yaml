@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cert-api
+  namespace: pki
+spec:
+  template:
+    spec:
+      containers:
+      - name: api
+        image: pkiazurecr.azurecr.io/cert-api:latest

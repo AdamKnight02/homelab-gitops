@@ -63,10 +63,10 @@ resource "aws_secretsmanager_secret_version" "db_credentials" {
 
   secret_id = aws_secretsmanager_secret.db_credentials[0].id
   secret_string = jsonencode({
-    username = "PLACEHOLDER"
-    password = "PLACEHOLDER"
+    username = ""
+    password = ""
     engine   = "postgres"
-    host     = "PLACEHOLDER"
+    host     = ""
     port     = 5432
     dbname   = "pki"
   })

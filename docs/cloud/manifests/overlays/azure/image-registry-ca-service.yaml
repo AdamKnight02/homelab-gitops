@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ca-service
+  namespace: pki
+spec:
+  template:
+    spec:
+      containers:
+      - name: service
+        image: pkiazurecr.azurecr.io/ca-service:latest

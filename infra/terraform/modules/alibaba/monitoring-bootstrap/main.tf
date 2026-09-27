@@ -49,7 +49,7 @@ locals {
   }
 
   grafana_values = {
-    adminPassword = var.grafana_admin_password != "" ? var.grafana_admin_password : "admin"
+    adminPassword = var.grafana_admin_password
     persistence = {
       enabled = true
       size    = "5Gi"

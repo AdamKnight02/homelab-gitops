@@ -11,8 +11,9 @@ resources:
 # Azure-specific patches
 patches:
   - path: storage-class-patch.yaml
-  - path: image-registry-patch.yaml
-  - path: trust-domain-patch.yaml
+  - path: image-registry-cert-api.yaml
+  - path: image-registry-cert-worker.yaml
+  - path: image-registry-ca-service.yaml
 
 # Azure-specific labels
 commonLabels:

@@ -91,7 +91,7 @@ scenarios:
       network: true
       cluster: true
     credential_refs:
-      api_key: "openbao:pki/digicert/api-key"
+      api_key: openbao:pki/digicert/api-key
       account_id: "openbao:pki/digicert/account-id"
     test_steps:
       - "Configure DigiCert API credentials"
@@ -125,7 +125,7 @@ scenarios:
       network: true
       cluster: true
     credential_refs:
-      api_key: "openbao:pki/sectigo/api-key"
+      api_key: openbao:pki/sectigo/api-key
       account_id: "openbao:pki/sectigo/account-id"
     capabilities:
       issue: true
@@ -149,7 +149,7 @@ scenarios:
       network: true
       cluster: true
     credential_refs:
-      api_key: "openbao:pki/globalsign/api-key"
+      api_key: openbao:pki/globalsign/api-key
       account_id: "openbao:pki/globalsign/account-id"
     capabilities:
       issue: true
@@ -173,7 +173,7 @@ scenarios:
       network: true
       cluster: true
     credential_refs:
-      api_key: "openbao:pki/entrust/api-key"
+      api_key: openbao:pki/entrust/api-key
       account_id: "openbao:pki/entrust/account-id"
     capabilities:
       issue: true
@@ -197,7 +197,7 @@ scenarios:
       network: true
       cluster: true
     credential_refs:
-      api_key: "openbao:pki/godaddy/api-key"
+      api_key: openbao:pki/godaddy/api-key
       api_secret: "openbao:pki/godaddy/api-secret"
     capabilities:
       issue: true
@@ -220,7 +220,7 @@ scenarios:
       network: true
       cluster: true
     credential_refs:
-      api_key: "openbao:pki/custom-ca/api-key"
+      api_key: openbao:pki/custom-ca/api-key
     capabilities:
       issue: true
       renew: true

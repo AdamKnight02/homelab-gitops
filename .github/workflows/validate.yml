@@ -251,10 +251,14 @@ jobs:
           # Validate terraform module structure
           for provider in ['azure', 'aws']:
               tf_dir = f'infra/terraform/{provider}'
-              required_files = ['main.tf', 'variables.tf', 'outputs.tf', 'providers.tf']
+              required_files = ['main.tf', 'variables.tf', 'outputs.tf']
               for rf in required_files:
                   if not os.path.isfile(os.path.join(tf_dir, rf)):
                       errors.append(f"Missing {rf} in {tf_dir}")
+              # provider config may live in providers.tf or versions.tf
+              if not any(os.path.isfile(os.path.join(tf_dir, pf))
+                         for pf in ('providers.tf', 'versions.tf')):
+                  errors.append(f"Missing providers.tf or versions.tf in {tf_dir}")
 
           if errors:
               for e in errors:

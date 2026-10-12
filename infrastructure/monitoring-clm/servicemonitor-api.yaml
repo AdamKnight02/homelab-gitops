@@ -5,6 +5,7 @@ metadata:
   namespace: clm
   labels:
     app.kubernetes.io/part-of: clm
+    release: kube-prometheus-stack
 spec:
   selector:
     matchLabels:

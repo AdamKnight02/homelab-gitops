@@ -48,7 +48,7 @@ kind: Service
 metadata:
   name: clm-api
   namespace: clm
-  labels: {app.kubernetes.io/part-of: clm}
+  labels: {app.kubernetes.io/part-of: clm, app: clm-api}
 spec:
   selector: {app: clm-api}
   ports:

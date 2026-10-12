@@ -1,0 +1,31 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: clm-workers
+  namespace: clm
+  labels:
+    app.kubernetes.io/part-of: clm
+spec:
+  selector:
+    matchLabels:
+      app: clm-worker
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: clm-scheduler
+  namespace: clm
+  labels:
+    app.kubernetes.io/part-of: clm
+spec:
+  selector:
+    matchLabels:
+      app: clm-scheduler
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics

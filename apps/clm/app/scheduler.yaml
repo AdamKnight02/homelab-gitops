@@ -1,0 +1,40 @@
+# clm-scheduler: renewal scan loop (brief §18). Same image; no WORKER_ROLE.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clm-scheduler
+  namespace: clm
+  labels: {app.kubernetes.io/part-of: clm, app.kubernetes.io/component: scheduler}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: clm-scheduler}
+  template:
+    metadata:
+      labels: {app: clm-scheduler, app.kubernetes.io/part-of: clm}
+    spec:
+      serviceAccountName: clm-worker
+      terminationGracePeriodSeconds: 20
+      containers:
+      - name: scheduler
+        image: 192.168.122.74:30500/clm-app:phase10
+        imagePullPolicy: IfNotPresent
+        command: ["python", "-m", "scheduler.main"]
+        env:
+        - name: WORKER_NAME
+          valueFrom: {fieldRef: {fieldPath: metadata.name}}
+        - name: DATABASE_URL
+          valueFrom: {secretKeyRef: {name: clm-postgres-auth, key: database-url}}
+        - name: AMQP_URL
+          valueFrom: {secretKeyRef: {name: clm-rabbitmq-auth, key: amqp-url}}
+        - name: SCHEDULER_SCAN_INTERVAL_SECONDS
+          value: "60"
+        envFrom:
+        - configMapRef: {name: clm-worker-config}
+        ports:
+        - {name: metrics, containerPort: 9090}
+        readinessProbe: {httpGet: {path: /readyz, port: metrics}, initialDelaySeconds: 5, periodSeconds: 10}
+        livenessProbe: {httpGet: {path: /healthz, port: metrics}, initialDelaySeconds: 15, periodSeconds: 20}
+        resources:
+          requests: {cpu: 25m, memory: 96Mi}
+          limits: {cpu: 300m, memory: 256Mi}

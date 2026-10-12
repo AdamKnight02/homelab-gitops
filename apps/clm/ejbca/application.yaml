@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: clm-ejbca
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    app.kubernetes.io/name: clm-ejbca
+    app.kubernetes.io/part-of: clm
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/AdamKnight02/homelab-gitops.git
+    targetRevision: main
+    path: apps/clm/ejbca
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ejbca
+  # Manual sync during migration — MUST NOT sync before the ejbca DB restore
+  # is verified (an empty DB would initialize a blank CA hierarchy).
+  # Flip to automated (prune+selfHeal) after cutover soak.
+  syncPolicy:
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

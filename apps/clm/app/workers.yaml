@@ -1,0 +1,138 @@
+# clm-worker-* Deployments. One image; WORKER_ROLE selects queues/handlers.
+# Env secrets: database-url from clm-postgres-auth, amqp-url from clm-rabbitmq-auth.
+# Issuance worker additionally mounts ejbca-clm-api (mTLS client identity).
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clm-worker-issuance
+  namespace: clm
+  labels: {app.kubernetes.io/part-of: clm, app.kubernetes.io/component: worker, clm.io/role: issuance}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: clm-worker, clm.io/role: issuance}
+  template:
+    metadata:
+      labels: {app: clm-worker, app.kubernetes.io/part-of: clm, clm.io/role: issuance}
+    spec:
+      serviceAccountName: clm-worker
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: ejbca
+        secret:
+          secretName: ejbca-clm-api
+      containers:
+      - name: worker
+        image: 192.168.122.74:30500/clm-app:phase10
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: WORKER_ROLE
+          value: issuance
+        - name: WORKER_NAME
+          valueFrom: {fieldRef: {fieldPath: metadata.name}}
+        - name: DATABASE_URL
+          valueFrom: {secretKeyRef: {name: clm-postgres-auth, key: database-url}}
+        - name: AMQP_URL
+          valueFrom: {secretKeyRef: {name: clm-rabbitmq-auth, key: amqp-url}}
+        - name: EJBCA_BASE_URL
+          value: "https://ejbca.ejbca.svc.cluster.local:8443/ejbca/ejbca-rest-api"
+        - name: EJBCA_TLS_VERIFY
+          value: "false"    # LAB CAVEAT (brief §3); flip to true after EJBCA server-cert SAN fix
+        - name: EJBCA_CA_BUNDLE_PATH
+          value: "/var/run/secrets/ejbca/ca-chain.pem"
+        - name: EJBCA_CLIENT_P12_PATH
+          value: "/var/run/secrets/ejbca/client.p12"
+        - name: EJBCA_CLIENT_P12_PASSWORD
+          valueFrom: {secretKeyRef: {name: ejbca-clm-api, key: p12-password}}
+        - name: CLOUDFLARE_API_TOKEN
+          valueFrom: {secretKeyRef: {name: clm-cloudflare-auth, key: api-token, optional: true}}
+        envFrom:
+        - configMapRef: {name: clm-worker-config}
+        volumeMounts:
+        - {name: ejbca, mountPath: /var/run/secrets/ejbca, readOnly: true}
+        ports:
+        - {name: metrics, containerPort: 9090}
+        readinessProbe: {httpGet: {path: /readyz, port: metrics}, initialDelaySeconds: 5, periodSeconds: 10}
+        livenessProbe: {httpGet: {path: /healthz, port: metrics}, initialDelaySeconds: 15, periodSeconds: 20}
+        resources:
+          requests: {cpu: 50m, memory: 128Mi}
+          limits: {cpu: 500m, memory: 512Mi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clm-worker-deployment
+  namespace: clm
+  labels: {app.kubernetes.io/part-of: clm, app.kubernetes.io/component: worker, clm.io/role: deployment}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: clm-worker, clm.io/role: deployment}
+  template:
+    metadata:
+      labels: {app: clm-worker, app.kubernetes.io/part-of: clm, clm.io/role: deployment}
+    spec:
+      serviceAccountName: clm-worker
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: worker
+        image: 192.168.122.74:30500/clm-app:phase10
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: WORKER_ROLE
+          value: deployment
+        - name: WORKER_NAME
+          valueFrom: {fieldRef: {fieldPath: metadata.name}}
+        - name: DATABASE_URL
+          valueFrom: {secretKeyRef: {name: clm-postgres-auth, key: database-url}}
+        - name: AMQP_URL
+          valueFrom: {secretKeyRef: {name: clm-rabbitmq-auth, key: amqp-url}}
+        envFrom:
+        - configMapRef: {name: clm-worker-config}
+        ports:
+        - {name: metrics, containerPort: 9090}
+        readinessProbe: {httpGet: {path: /readyz, port: metrics}, initialDelaySeconds: 5, periodSeconds: 10}
+        livenessProbe: {httpGet: {path: /healthz, port: metrics}, initialDelaySeconds: 15, periodSeconds: 20}
+        resources:
+          requests: {cpu: 50m, memory: 128Mi}
+          limits: {cpu: 500m, memory: 512Mi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clm-worker-verification
+  namespace: clm
+  labels: {app.kubernetes.io/part-of: clm, app.kubernetes.io/component: worker, clm.io/role: verification}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: clm-worker, clm.io/role: verification}
+  template:
+    metadata:
+      labels: {app: clm-worker, app.kubernetes.io/part-of: clm, clm.io/role: verification}
+    spec:
+      serviceAccountName: clm-worker
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: worker
+        image: 192.168.122.74:30500/clm-app:phase10
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: WORKER_ROLE
+          value: verification
+        - name: WORKER_NAME
+          valueFrom: {fieldRef: {fieldPath: metadata.name}}
+        - name: DATABASE_URL
+          valueFrom: {secretKeyRef: {name: clm-postgres-auth, key: database-url}}
+        - name: AMQP_URL
+          valueFrom: {secretKeyRef: {name: clm-rabbitmq-auth, key: amqp-url}}
+        envFrom:
+        - configMapRef: {name: clm-worker-config}
+        ports:
+        - {name: metrics, containerPort: 9090}
+        readinessProbe: {httpGet: {path: /readyz, port: metrics}, initialDelaySeconds: 5, periodSeconds: 10}
+        livenessProbe: {httpGet: {path: /healthz, port: metrics}, initialDelaySeconds: 15, periodSeconds: 20}
+        resources:
+          requests: {cpu: 50m, memory: 128Mi}
+          limits: {cpu: 500m, memory: 512Mi}

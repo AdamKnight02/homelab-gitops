@@ -1,0 +1,56 @@
+# clm-api: REST API (FastAPI/uvicorn). Tenant-scoped via X-Tenant-ID + RLS;
+# platform ops gated by X-Platform-Key (secret clm-api-auth).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clm-api
+  namespace: clm
+  labels: {app.kubernetes.io/part-of: clm, app.kubernetes.io/component: api}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: clm-api}
+  template:
+    metadata:
+      labels: {app: clm-api, app.kubernetes.io/part-of: clm}
+    spec:
+      serviceAccountName: clm-worker
+      terminationGracePeriodSeconds: 20
+      containers:
+      - name: api
+        image: 192.168.122.74:30500/clm-app:phase10
+        imagePullPolicy: IfNotPresent
+        command: ["python", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080"]
+        env:
+        - name: DATABASE_URL
+          valueFrom: {secretKeyRef: {name: clm-postgres-auth, key: database-url}}
+        - name: AMQP_URL
+          valueFrom: {secretKeyRef: {name: clm-rabbitmq-auth, key: amqp-url}}
+        - name: PLATFORM_API_KEY
+          valueFrom: {secretKeyRef: {name: clm-api-auth, key: platform-api-key}}
+        - name: CLM_INTERNAL_TOKEN
+          valueFrom: {secretKeyRef: {name: clm-internal-auth, key: internal-token}}
+        - name: CLM_DEFAULT_TENANT_SLUG
+          value: "keystone-lab"
+        envFrom:
+        - configMapRef: {name: clm-worker-config}
+        ports:
+        - {name: http, containerPort: 8080}
+        - {name: metrics, containerPort: 9090}
+        readinessProbe: {httpGet: {path: /readyz, port: metrics}, initialDelaySeconds: 5, periodSeconds: 10}
+        livenessProbe: {httpGet: {path: /healthz, port: metrics}, initialDelaySeconds: 15, periodSeconds: 20}
+        resources:
+          requests: {cpu: 50m, memory: 128Mi}
+          limits: {cpu: 500m, memory: 512Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clm-api
+  namespace: clm
+  labels: {app.kubernetes.io/part-of: clm}
+spec:
+  selector: {app: clm-api}
+  ports:
+  - {name: http, port: 8080, targetPort: http}
+  - {name: metrics, port: 9090, targetPort: metrics}

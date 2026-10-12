@@ -1,0 +1,31 @@
+# Traefik ingress controller via the k3s built-in Helm controller.
+# The target k3s was installed with traefik disabled; this HelmChart CR
+# installs the same upstream chart generation as the source cluster
+# (source runs chart 40.1.5 / traefik v3.7.x) with a klipper LoadBalancer
+# binding node ports 80/443.
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  repo: https://traefik.github.io/charts
+  chart: traefik
+  version: "40.1.5"
+  targetNamespace: kube-system
+  valuesContent: |-
+    global:
+      checkNewVersion: false
+      sendAnonymousUsage: false
+    service:
+      type: LoadBalancer
+    ports:
+      web:
+        port: 80
+        exposedPort: 80
+      websecure:
+        port: 443
+        exposedPort: 443
+    logs:
+      general:
+        level: WARN

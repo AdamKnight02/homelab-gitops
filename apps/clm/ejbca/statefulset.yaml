@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ejbca
+  namespace: ejbca
+  labels:
+    app.kubernetes.io/instance: ejbca
+    app.kubernetes.io/name: ejbca-ce
+    app.kubernetes.io/part-of: clm
+    app.kubernetes.io/version: 9.6.3
+spec:
+  replicas: 1
+  serviceName: ""
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: ejbca
+      app.kubernetes.io/name: ejbca-ce
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: ejbca
+        app.kubernetes.io/name: ejbca-ce
+    spec:
+      serviceAccountName: ejbca
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: ejbca-ce
+          image: keyfactor/ejbca-ce:9.6.3
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DATABASE_JDBC_URL
+              value: jdbc:postgresql://clm-postgres.clm.svc.cluster.local:5432/ejbca
+            - name: DATABASE_USER
+              value: ejbca
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ejbca-db-auth
+                  key: password
+            - name: EJBCA_RNGALGORITHM
+              value: default
+            - name: LOG_AUDIT_TO_DB
+              value: "true"
+            - name: LOG_LEVEL_APP
+              value: INFO
+            - name: LOG_LEVEL_SERVER
+              value: INFO
+            - name: METRICS_ENABLED
+              value: "false"
+            - name: OBSERVABLE_BIND
+              value: 127.0.0.1
+            - name: OCSP_CHECK_SIGN_CERT_VALIDITY
+              value: "true"
+            - name: SMTP_DESTINATION
+              value: localhost
+            - name: SMTP_DESTINATION_PORT
+              value: "25"
+            - name: SMTP_FROM
+              value: no-reply@localhost
+            - name: SMTP_SSL_ENABLED
+              value: "true"
+            - name: SMTP_TLS_ENABLED
+              value: "true"
+            - name: SMTP_USERNAME
+              value: ejbca-mail
+            - name: TLS_SETUP_ENABLED
+              value: simple
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: https
+              containerPort: 8443
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/bash
+                  - -c
+                  - |
+                    sed -i s/https=443/https=8443/g /opt/primekey/ejbca/conf/web.properties
+                    sed -i s/pubhttp=80/pubhttp=8080/g /opt/primekey/ejbca/conf/web.properties
+          startupProbe:
+            tcpSocket:
+              port: 8443
+            initialDelaySeconds: 15
+            periodSeconds: 2
+            failureThreshold: 500
+          livenessProbe:
+            tcpSocket:
+              port: 8443
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 3Gi

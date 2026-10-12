@@ -1,6 +1,19 @@
 # K3s registry mirror configuration
-# Place at /etc/rancher/k3s/registries.yaml on each node
+# Place at /etc/rancher/k3s/registries.yaml on each node (requires k3s restart).
+# Applied manually in migration stage 3 — this repo copy is the source of truth.
+#
+# The local registry is reachable at:
+#   - NodePort: 192.168.122.74:30500  (stable; use this in image references)
+#   - ClusterIP: 10.43.164.190:5000   (in-cluster only)
+# NOTE: stale pod-IP mirrors (10.42.0.23:5000, 10.42.0.88:5000) were removed —
+# pod IPs are ephemeral and broke image pulls (observed on pki cronjobs).
 mirrors:
+  "192.168.122.74:30500":
+    endpoint:
+      - "http://192.168.122.74:30500"
+  "10.43.164.190:5000":
+    endpoint:
+      - "http://10.43.164.190:5000"
   "registry.registry.svc.cluster.local:5000":
     endpoint:
       - "http://registry.registry.svc.cluster.local:5000"
@@ -8,6 +21,12 @@ mirrors:
     endpoint:
       - "http://registry.registry.svc.cluster.local:5000"
 configs:
+  "192.168.122.74:30500":
+    tls:
+      insecure_skip_verify: true
+  "10.43.164.190:5000":
+    tls:
+      insecure_skip_verify: true
   "registry.registry.svc.cluster.local:5000":
     tls:
       insecure_skip_verify: true

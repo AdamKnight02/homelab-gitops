@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clm-postgres-init
+  namespace: clm
+  labels:
+    app.kubernetes.io/part-of: clm
+data:
+  001-init.sh: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    psql \
+      -v ON_ERROR_STOP=1 \
+      --username "$POSTGRES_USER" \
+      --dbname "$POSTGRES_DB" \
+      --set=migrator_password="$CLM_MIGRATOR_PASSWORD" \
+      --set=app_password="$CLM_APP_PASSWORD" <<'EOSQL'
+
+    CREATE ROLE clm_migrator
+      LOGIN
+      NOSUPERUSER
+      NOCREATEDB
+      NOCREATEROLE
+      NOREPLICATION
+      PASSWORD :'migrator_password';
+
+    CREATE ROLE clm_app
+      LOGIN
+      NOSUPERUSER
+      NOCREATEDB
+      NOCREATEROLE
+      NOREPLICATION
+      PASSWORD :'app_password';
+
+    ALTER DATABASE clm OWNER TO clm_migrator;
+
+    GRANT CONNECT ON DATABASE clm
+      TO clm_migrator, clm_app;
+
+    REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+
+    GRANT USAGE ON SCHEMA public
+      TO clm_app;
+
+    ALTER DEFAULT PRIVILEGES
+      FOR ROLE clm_migrator
+      IN SCHEMA public
+      GRANT SELECT, INSERT, UPDATE, DELETE
+      ON TABLES
+      TO clm_app;
+
+    ALTER DEFAULT PRIVILEGES
+      FOR ROLE clm_migrator
+      IN SCHEMA public
+      GRANT USAGE, SELECT
+      ON SEQUENCES
+      TO clm_app;
+
+    EOSQL
+  002-ejbca.sh: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Creates the EJBCA role + empty database so the platform matches the
+    # source topology (EJBCA persists entirely in this postgres instance).
+    # pg_restore of the source `ejbca` DB fills it during migration stage 5.
+    psql \
+      -v ON_ERROR_STOP=1 \
+      --username "$POSTGRES_USER" \
+      --dbname "$POSTGRES_DB" \
+      --set=ejbca_password="$EJBCA_PASSWORD" <<'EOSQL'
+
+    CREATE ROLE ejbca
+      LOGIN
+      NOSUPERUSER
+      NOCREATEDB
+      NOCREATEROLE
+      NOREPLICATION
+      PASSWORD :'ejbca_password';
+
+    CREATE DATABASE ejbca OWNER ejbca;
+
+    EOSQL

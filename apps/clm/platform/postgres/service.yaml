@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: clm-postgres
+  namespace: clm
+  labels:
+    app.kubernetes.io/part-of: clm
+spec:
+  type: ClusterIP
+  selector:
+    app: clm-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clm-postgres-headless
+  namespace: clm
+  labels:
+    app.kubernetes.io/part-of: clm
+spec:
+  clusterIP: None
+  selector:
+    app: clm-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432

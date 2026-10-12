@@ -1,0 +1,34 @@
+# RBAC for CLM workloads: key storage (issuance/deployment workers write/read
+# private-key Secrets in clm ns) and future deployment-provider access.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: clm-worker
+  namespace: clm
+  labels: {app.kubernetes.io/part-of: clm}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: clm-key-secrets
+  namespace: clm
+  labels: {app.kubernetes.io/part-of: clm}
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: clm-worker-key-secrets
+  namespace: clm
+  labels: {app.kubernetes.io/part-of: clm}
+subjects:
+- kind: ServiceAccount
+  name: clm-worker
+  namespace: clm
+roleRef:
+  kind: Role
+  name: clm-key-secrets
+  apiGroup: rbac.authorization.k8s.io

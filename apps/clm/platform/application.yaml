@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: clm-platform
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    app.kubernetes.io/name: clm-platform
+    app.kubernetes.io/part-of: clm
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/AdamKnight02/homelab-gitops.git
+    targetRevision: main
+    path: apps/clm/platform
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: clm
+  # Manual sync during migration; flip to automated (prune+selfHeal) after cutover soak.
+  syncPolicy:
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

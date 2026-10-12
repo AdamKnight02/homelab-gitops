@@ -1,0 +1,81 @@
+# clm-ui: SPA + API reverse proxy. Exposed via Traefik Ingress.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clm-ui
+  namespace: clm
+  labels: {app.kubernetes.io/part-of: clm, app.kubernetes.io/component: ui}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: clm-ui}
+  template:
+    metadata:
+      labels: {app: clm-ui, app.kubernetes.io/part-of: clm}
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: ui
+        image: 192.168.122.74:30500/clm-app:phase10
+        imagePullPolicy: IfNotPresent
+        command: ["python", "-m", "ui.server"]
+        env:
+        - name: CLM_API_URL
+          value: "http://clm-api.clm.svc.cluster.local:8080"
+        - name: PORT
+          value: "8080"
+        - name: AUTH0_ENABLED
+          value: "true"
+        - name: AUTH0_DOMAIN
+          valueFrom: {secretKeyRef: {name: clm-auth0, key: domain}}
+        - name: AUTH0_CLIENT_ID
+          valueFrom: {secretKeyRef: {name: clm-auth0, key: client-id}}
+        - name: AUTH0_CLIENT_SECRET
+          valueFrom: {secretKeyRef: {name: clm-auth0, key: client-secret}}
+        - name: AUTH0_SESSION_SECRET
+          valueFrom: {secretKeyRef: {name: clm-auth0, key: session-secret}}
+        - name: AUTH0_CALLBACK_URL
+          value: "https://keystonepartners.cloud/auth/callback"
+        - name: AUTH0_LOGOUT_URL
+          value: "https://keystonepartners.cloud/"
+        - name: CLM_INTERNAL_TOKEN
+          valueFrom: {secretKeyRef: {name: clm-internal-auth, key: internal-token}}
+        - name: DATABASE_URL
+          valueFrom: {secretKeyRef: {name: clm-postgres-auth, key: database-url}}
+        - name: AMQP_URL
+          valueFrom: {secretKeyRef: {name: clm-rabbitmq-auth, key: amqp-url}}
+        ports:
+        - {name: http, containerPort: 8080}
+        readinessProbe: {httpGet: {path: /healthz, port: http}, initialDelaySeconds: 3, periodSeconds: 10}
+        livenessProbe: {httpGet: {path: /healthz, port: http}, initialDelaySeconds: 10, periodSeconds: 20}
+        resources:
+          requests: {cpu: 25m, memory: 64Mi}
+          limits: {cpu: 300m, memory: 256Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clm-ui
+  namespace: clm
+  labels: {app.kubernetes.io/part-of: clm}
+spec:
+  selector: {app: clm-ui}
+  ports:
+  - {name: http, port: 8080, targetPort: http}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: clm-ui
+  namespace: clm
+  labels: {app.kubernetes.io/part-of: clm}
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: clm-ui
+            port: {number: 8080}

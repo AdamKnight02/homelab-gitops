@@ -17,10 +17,13 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: ejbca
-  # Manual sync during migration — MUST NOT sync before the ejbca DB restore
-  # is verified (an empty DB would initialize a blank CA hierarchy).
-  # Flip to automated (prune+selfHeal) after cutover soak.
   syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
     retry:
       limit: 5
       backoff:

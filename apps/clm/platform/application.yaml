@@ -17,8 +17,13 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: clm
-  # Manual sync during migration; flip to automated (prune+selfHeal) after cutover soak.
   syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
     retry:
       limit: 5
       backoff:

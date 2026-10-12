@@ -23,6 +23,9 @@ spec:
           args:
             - tunnel
             - --no-autoupdate
+            - --protocol
+            - http2   # QUIC/UDP-7844 unreliable through host NAT path;
+                      # http2 uses TCP/443, proven working from this cluster
             - run
             - --token
             - $(TUNNEL_TOKEN)

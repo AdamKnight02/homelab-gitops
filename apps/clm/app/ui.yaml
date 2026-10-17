@@ -16,7 +16,7 @@ spec:
       terminationGracePeriodSeconds: 10
       containers:
       - name: ui
-        image: 192.168.122.74:30500/clm-app:phase10
+        image: 192.168.122.74:30500/clm-app:phase11
         imagePullPolicy: IfNotPresent
         command: ["python", "-m", "ui.server"]
         env:

@@ -28,6 +28,8 @@ spec:
           valueFrom: {secretKeyRef: {name: clm-rabbitmq-auth, key: amqp-url}}
         - name: PLATFORM_API_KEY
           valueFrom: {secretKeyRef: {name: clm-api-auth, key: platform-api-key}}
+        - name: CLM_LEGACY_AUTH_ENABLED
+          value: "true"
         - name: CLM_INTERNAL_TOKEN
           valueFrom: {secretKeyRef: {name: clm-internal-auth, key: internal-token}}
         - name: CLM_DEFAULT_TENANT_SLUG

@@ -18,7 +18,7 @@ spec:
       terminationGracePeriodSeconds: 20
       containers:
       - name: api
-        image: 192.168.122.74:30500/clm-app:phase12-enterprise-r2
+        image: 192.168.122.74:30500/clm-app:phase12-enterprise-r3
         imagePullPolicy: IfNotPresent
         command: ["python", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080"]
         env:

@@ -32,6 +32,8 @@ spec:
           valueFrom: {secretKeyRef: {name: clm-internal-auth, key: internal-token}}
         - name: CLM_DEFAULT_TENANT_SLUG
           value: "keystone-lab"
+        - name: CLM_ADCS_CONNECTOR_TOKEN
+          valueFrom: {secretKeyRef: {name: clm-adcs-connector, key: token}}
         envFrom:
         - configMapRef: {name: clm-worker-config}
         ports:

@@ -29,6 +29,8 @@ spec:
           valueFrom: {secretKeyRef: {name: clm-rabbitmq-auth, key: amqp-url}}
         - name: SCHEDULER_SCAN_INTERVAL_SECONDS
           value: "60"
+        - name: CLM_ADCS_CONNECTOR_TOKEN
+          valueFrom: {secretKeyRef: {name: clm-adcs-connector, key: token}}
         envFrom:
         - configMapRef: {name: clm-worker-config}
         ports:

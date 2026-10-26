@@ -47,6 +47,8 @@ spec:
           valueFrom: {secretKeyRef: {name: ejbca-clm-api, key: p12-password}}
         - name: CLOUDFLARE_API_TOKEN
           valueFrom: {secretKeyRef: {name: clm-cloudflare-auth, key: api-token, optional: true}}
+        - name: CLM_ADCS_CONNECTOR_TOKEN
+          valueFrom: {secretKeyRef: {name: clm-adcs-connector, key: token}}
         envFrom:
         - configMapRef: {name: clm-worker-config}
         volumeMounts:
@@ -88,6 +90,8 @@ spec:
           valueFrom: {secretKeyRef: {name: clm-postgres-auth, key: database-url}}
         - name: AMQP_URL
           valueFrom: {secretKeyRef: {name: clm-rabbitmq-auth, key: amqp-url}}
+        - name: CLM_ADCS_CONNECTOR_TOKEN
+          valueFrom: {secretKeyRef: {name: clm-adcs-connector, key: token}}
         envFrom:
         - configMapRef: {name: clm-worker-config}
         ports:
@@ -127,6 +131,8 @@ spec:
           valueFrom: {secretKeyRef: {name: clm-postgres-auth, key: database-url}}
         - name: AMQP_URL
           valueFrom: {secretKeyRef: {name: clm-rabbitmq-auth, key: amqp-url}}
+        - name: CLM_ADCS_CONNECTOR_TOKEN
+          valueFrom: {secretKeyRef: {name: clm-adcs-connector, key: token}}
         envFrom:
         - configMapRef: {name: clm-worker-config}
         ports:

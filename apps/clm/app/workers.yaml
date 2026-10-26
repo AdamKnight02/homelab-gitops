@@ -24,7 +24,7 @@ spec:
           secretName: ejbca-clm-api
       containers:
       - name: worker
-        image: 192.168.122.74:30500/clm-app:phase12-enterprise-r3
+        image: 192.168.122.74:30500/clm-app:phase12-enterprise-r4
         imagePullPolicy: IfNotPresent
         env:
         - name: WORKER_ROLE
@@ -79,7 +79,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
       - name: worker
-        image: 192.168.122.74:30500/clm-app:phase12-enterprise-r3
+        image: 192.168.122.74:30500/clm-app:phase12-enterprise-r4
         imagePullPolicy: IfNotPresent
         env:
         - name: WORKER_ROLE
@@ -120,7 +120,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
       - name: worker
-        image: 192.168.122.74:30500/clm-app:phase12-enterprise-r3
+        image: 192.168.122.74:30500/clm-app:phase12-enterprise-r4
         imagePullPolicy: IfNotPresent
         env:
         - name: WORKER_ROLE

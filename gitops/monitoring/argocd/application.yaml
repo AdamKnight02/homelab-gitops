@@ -54,9 +54,7 @@ spec:
         - .metadata.annotations."controller-gen.kubebuilder.io/version"
 
   syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
+    # CONTAINMENT 2026-10-27: automated sync disabled during incident recovery; restore after stabilization
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true

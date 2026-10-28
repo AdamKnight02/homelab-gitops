@@ -18,9 +18,7 @@ spec:
     server: https://kubernetes.default.svc
     namespace: clm
   syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
+    # CONTAINMENT 2026-10-27: automated sync disabled during incident recovery; restore after stabilization
     syncOptions:
       - PrunePropagationPolicy=foreground
       - PruneLast=true

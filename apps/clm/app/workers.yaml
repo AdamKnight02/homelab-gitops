@@ -9,7 +9,7 @@ metadata:
   namespace: clm
   labels: {app.kubernetes.io/part-of: clm, app.kubernetes.io/component: worker, clm.io/role: issuance}
 spec:
-  replicas: 0  # CONTAINMENT: incident hold 2026-10-27 — restore to 1 after renewal-bug repair
+  replicas: 1
   selector:
     matchLabels: {app: clm-worker, clm.io/role: issuance}
   template:
@@ -68,7 +68,7 @@ metadata:
   namespace: clm
   labels: {app.kubernetes.io/part-of: clm, app.kubernetes.io/component: worker, clm.io/role: deployment}
 spec:
-  replicas: 0  # CONTAINMENT: incident hold 2026-10-27 — restore to 1 after renewal-bug repair
+  replicas: 1
   selector:
     matchLabels: {app: clm-worker, clm.io/role: deployment}
   template:
@@ -109,7 +109,7 @@ metadata:
   namespace: clm
   labels: {app.kubernetes.io/part-of: clm, app.kubernetes.io/component: worker, clm.io/role: verification}
 spec:
-  replicas: 0  # CONTAINMENT: incident hold 2026-10-27 — restore to 1 after renewal-bug repair
+  replicas: 1
   selector:
     matchLabels: {app: clm-worker, clm.io/role: verification}
   template:

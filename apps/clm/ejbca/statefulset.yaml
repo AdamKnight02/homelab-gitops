@@ -31,6 +31,8 @@ spec:
           image: keyfactor/ejbca-ce:9.6.3
           imagePullPolicy: IfNotPresent
           env:
+            - name: JAVA_OPTS_CUSTOM
+              value: "-XX:-UseBASE64Intrinsics"
             - name: DATABASE_JDBC_URL
               value: jdbc:postgresql://clm-postgres.clm.svc.cluster.local:5432/ejbca
             - name: DATABASE_USER
